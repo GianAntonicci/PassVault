@@ -113,7 +113,7 @@ bool inputRead(int &x, int &y, int &gesture) {
 //  BTN_DOWN (GPIO0):  clique = proximo alvo   | segurar = confirma (toque)
 //  BTN_UP   (GPIO14): clique = alvo anterior  | segurar = voltar
 
-#define FOCUS_MAX  24
+#define FOCUS_MAX  48   // teclado da busca: 36 teclas + 3 acoes
 
 struct FocusTarget { int16_t x, y, w, h; uint8_t flags; };
 

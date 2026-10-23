@@ -18,7 +18,7 @@ TFT_eSPI tft = TFT_eSPI();
 #include "vault_web.h"
 
 // ---- State machine ----
-enum State { ST_PIN_SETUP, ST_PIN_CONFIRM, ST_PIN_ENTRY, ST_MENU, ST_DETAIL, ST_WEB };
+enum State { ST_PIN_SETUP, ST_PIN_CONFIRM, ST_PIN_ENTRY, ST_MENU, ST_DETAIL, ST_WEB, ST_SEARCH };
 State state = ST_PIN_ENTRY;
 
 char pinBuf[PIN_LEN_MAX + 1]     = "";
@@ -27,6 +27,11 @@ int  pinPos   = 0;
 int  pinLen   = PIN_LEN;   // vault novo usa PIN_LEN; vault existente, o tamanho salvo
 int  selCred  = 0;
 int  menuTop  = 0;
+
+// Busca por nome: filtro aplicado a lista do menu
+char searchBuf[33] = "";
+int  filt[MAX_CREDS];
+int  filtCount = 0;
 
 unsigned long lockoutEnd = 0;
 unsigned long lockoutTick = 0;
@@ -67,6 +72,7 @@ unsigned long lastAction = 0;
 void drawMenu();
 void drawDetail();
 void drawWebScreen();
+void drawSearch();
 void drawPinScreen(const char* title);
 void lockDevice();
 
@@ -311,9 +317,23 @@ void handlePinTouch(int tx, int ty) {
 
 // ---- Menu ----
 #define MENU_ITEM_H  30
-#define MENU_VISIBLE ((SCR_H - 110) / MENU_ITEM_H)
+#define MENU_VISIBLE ((SCR_H - 65 - MENU_LIST_Y) / MENU_ITEM_H)
 #define MENU_BTN_W   75
 #define MENU_BTN_H   38
+
+// Campo de busca: landscape fica no cabecalho, portrait ganha uma linha propria
+#ifdef USE_LANDSCAPE
+  #define SRCH_X       132
+  #define SRCH_Y       6
+  #define SRCH_W       (SCR_W - 50 - 6 - SRCH_X)
+  #define MENU_LIST_Y  45
+#else
+  #define SRCH_X       4
+  #define SRCH_Y       40
+  #define SRCH_W       (SCR_W - 8)
+  #define MENU_LIST_Y  72
+#endif
+#define SRCH_H       26
 
 // Placas sem gesto de swipe ganham uma coluna de botoes cima/baixo ao lado da lista
 #ifdef MENU_SCROLL_BTNS
@@ -321,8 +341,8 @@ void handlePinTouch(int tx, int ty) {
   #define MENU_ITEM_W  (SCR_W - 8 - MENU_SCR_W - 4)
   #define MENU_SCR_X   (SCR_W - 4 - MENU_SCR_W)
   #define MENU_SCR_H   ((MENU_VISIBLE * MENU_ITEM_H - 2 - 4) / 2)
-  #define MENU_UP_Y    45
-  #define MENU_DN_Y    (45 + MENU_SCR_H + 4)
+  #define MENU_UP_Y    MENU_LIST_Y
+  #define MENU_DN_Y    (MENU_LIST_Y + MENU_SCR_H + 4)
 
 void drawScrollBtn(int y, bool up, bool enabled) {
   uint16_t bg = enabled ? C_BTN : C_CARD;
@@ -346,8 +366,33 @@ void drawKbdStatus() {
   tft.drawString(kbdLabel(), SCR_W - 10, 12, 2);
 }
 
+// Substring sem diferenciar maiusculas
+bool nameMatches(const char* name, const char* q) {
+  int nl = strlen(name), ql = strlen(q);
+  for (int i = 0; i + ql <= nl; i++) {
+    int j = 0;
+    while (j < ql && tolower(name[i + j]) == tolower(q[j])) j++;
+    if (j == ql) return true;
+  }
+  return false;
+}
+
+// Refeito a cada desenho: credenciais podem mudar pela web
+void applyFilter() {
+  filtCount = 0;
+  for (int i = 0; i < credCount; i++)
+    if (nameMatches(creds[i].name, searchBuf)) filt[filtCount++] = i;
+  if (menuTop > max(0, filtCount - MENU_VISIBLE)) menuTop = max(0, filtCount - MENU_VISIBLE);
+}
+
+void clearSearch() {
+  mbedtls_platform_zeroize(searchBuf, sizeof(searchBuf));
+  menuTop = 0;
+}
+
 void drawMenu() {
   focusBegin(ST_MENU);
+  applyFilter();
   tft.fillScreen(C_BG);
   tft.setTextColor(C_ACCENT);
   tft.setTextDatum(TL_DATUM);
@@ -355,31 +400,38 @@ void drawMenu() {
 
   drawKbdStatus();
 
-  int y = 45;
+  tft.fillRoundRect(SRCH_X, SRCH_Y, SRCH_W, SRCH_H, 4, C_CARD);
+  tft.drawRoundRect(SRCH_X, SRCH_Y, SRCH_W, SRCH_H, 4, searchBuf[0] ? C_ACCENT : C_DIM);
+  tft.setTextColor(searchBuf[0] ? C_TEXT : C_DIM);
+  tft.setTextDatum(ML_DATUM);
+  tft.drawString(searchBuf[0] ? searchBuf : "Buscar...", SRCH_X + 8, SRCH_Y + SRCH_H / 2, 2);
+  focusAdd(SRCH_X, SRCH_Y, SRCH_W, SRCH_H);
+
+  int y = MENU_LIST_Y;
   int visible = MENU_VISIBLE;
-  if (credCount == 0) {
+  if (filtCount == 0) {
     tft.setTextColor(C_DIM);
     tft.setTextDatum(TC_DATUM);
-    tft.drawString("Nenhuma credencial", SCR_W / 2, y + 20, 2);
+    tft.drawString(credCount ? "Nada encontrado" : "Nenhuma credencial", SCR_W / 2, y + 20, 2);
   } else {
-    for (int i = menuTop; i < credCount && i < menuTop + visible; i++) {
+    for (int i = menuTop; i < filtCount && i < menuTop + visible; i++) {
       tft.fillRoundRect(4, y, MENU_ITEM_W, MENU_ITEM_H - 2, 4, C_CARD);
       tft.setTextColor(C_TEXT);
       tft.setTextDatum(TL_DATUM);
-      tft.drawString(creds[i].name, 12, y + 7, 2);
+      tft.drawString(creds[filt[i]].name, 12, y + 7, 2);
       // Bordas da lista rolam ao inves de mover o foco
       uint8_t flags = 0;
       if (i == menuTop && menuTop > 0) flags |= FOCUS_SCROLL_UP;
-      if (i == menuTop + visible - 1 && i + 1 < credCount) flags |= FOCUS_SCROLL_DOWN;
+      if (i == menuTop + visible - 1 && i + 1 < filtCount) flags |= FOCUS_SCROLL_DOWN;
       focusAdd(4, y, MENU_ITEM_W, MENU_ITEM_H - 2, flags);
       y += MENU_ITEM_H;
     }
   }
 
 #ifdef MENU_SCROLL_BTNS
-  if (credCount > MENU_VISIBLE) {
+  if (filtCount > MENU_VISIBLE) {
     drawScrollBtn(MENU_UP_Y, true,  menuTop > 0);
-    drawScrollBtn(MENU_DN_Y, false, menuTop + MENU_VISIBLE < credCount);
+    drawScrollBtn(MENU_DN_Y, false, menuTop + MENU_VISIBLE < filtCount);
   }
 #endif
 
@@ -394,7 +446,7 @@ void handleMenuTouch(int tx, int ty, int gesture) {
 
 #ifdef MENU_SCROLL_BTNS
   // Botoes de rolagem equivalem aos gestos de swipe
-  if (credCount > MENU_VISIBLE) {
+  if (filtCount > MENU_VISIBLE) {
     if (inBox(tx, ty, MENU_SCR_X, MENU_UP_Y, MENU_SCR_W, MENU_SCR_H)) gesture = GESTURE_SWIPE_DOWN;
     if (inBox(tx, ty, MENU_SCR_X, MENU_DN_Y, MENU_SCR_W, MENU_SCR_H)) gesture = GESTURE_SWIPE_UP;
   }
@@ -405,9 +457,15 @@ void handleMenuTouch(int tx, int ty, int gesture) {
     drawMenu();
     return;
   }
-  if (gesture == GESTURE_SWIPE_UP && menuTop + MENU_VISIBLE < credCount) {
+  if (gesture == GESTURE_SWIPE_UP && menuTop + MENU_VISIBLE < filtCount) {
     menuTop++;
     drawMenu();
+    return;
+  }
+
+  if (inBox(tx, ty, SRCH_X, SRCH_Y, SRCH_W, SRCH_H)) {
+    state = ST_SEARCH;
+    drawSearch();
     return;
   }
 
@@ -423,15 +481,103 @@ void handleMenuTouch(int tx, int ty, int gesture) {
     return;
   }
 
-  int y = 45;
-  for (int i = menuTop; i < credCount && i < menuTop + MENU_VISIBLE; i++) {
+  int y = MENU_LIST_Y;
+  for (int i = menuTop; i < filtCount && i < menuTop + MENU_VISIBLE; i++) {
     if (inBox(tx, ty, 4, y, MENU_ITEM_W, MENU_ITEM_H - 2)) {
-      selCred = i;
+      selCred = filt[i];
       state = ST_DETAIL;
       drawDetail();
       return;
     }
     y += MENU_ITEM_H;
+  }
+}
+
+// ---- Busca (teclado na tela) ----
+// 36 teclas A-Z/0-9 + linha de acoes: 0=apagar 1=limpar 2=OK
+#ifdef USE_LANDSCAPE
+  #define KB_COLS  9
+  #define KB_KH    27
+  #define KB_Y0    72
+#else
+  #define KB_COLS  6
+  #define KB_KH    28
+  #define KB_Y0    74
+#endif
+#define KB_GAP   3
+#define KB_KEYS  36
+#define KB_KW    ((SCR_W - 8 - (KB_COLS - 1) * KB_GAP) / KB_COLS)
+#define KB_X0    ((SCR_W - (KB_COLS * KB_KW + (KB_COLS - 1) * KB_GAP)) / 2)
+#define KB_ACT_H 34
+#define KB_ACT_Y (SCR_H - KB_ACT_H - 6)
+#define KB_ACT_W ((SCR_W - 8 - 2 * KB_GAP) / 3)
+
+const char kbChars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+const char* kbActLabels[3] = {"<", "Limpar", "OK"};
+const uint16_t kbActColors[3] = {C_WARN, C_WARN, C_OK};
+
+void kbKeyPos(int i, int &x, int &y) {
+  x = KB_X0 + (i % KB_COLS) * (KB_KW + KB_GAP);
+  y = KB_Y0 + (i / KB_COLS) * (KB_KH + KB_GAP);
+}
+
+void drawSearchField() {
+  tft.fillRoundRect(4, 36, SCR_W - 8, 30, 4, C_CARD);
+  tft.setTextColor(C_TEXT, C_CARD);
+  tft.setTextDatum(ML_DATUM);
+  tft.drawString(searchBuf, 12, 51, 2);
+  char buf[16];
+  applyFilter();
+  snprintf(buf, sizeof(buf), "%d", filtCount);
+  tft.setTextColor(filtCount ? C_DIM : C_WARN, C_CARD);
+  tft.setTextDatum(MR_DATUM);
+  tft.drawString(buf, SCR_W - 12, 51, 2);
+}
+
+void drawSearch() {
+  focusBegin(ST_SEARCH);
+  tft.fillScreen(C_BG);
+  tft.setTextColor(C_ACCENT);
+  tft.setTextDatum(TL_DATUM);
+  tft.drawString("Buscar", 10, 8, 4);
+  drawSearchField();
+  for (int i = 0; i < KB_KEYS; i++) {
+    int x, y;
+    kbKeyPos(i, x, y);
+    char label[2] = { kbChars[i], 0 };
+    btn(x, y, KB_KW, KB_KH, label, C_BTN);
+  }
+  for (int i = 0; i < 3; i++)
+    btn(4 + i * (KB_ACT_W + KB_GAP), KB_ACT_Y, KB_ACT_W, KB_ACT_H, kbActLabels[i], kbActColors[i]);
+  focusEnd();
+}
+
+void closeSearch() {
+  menuTop = 0;
+  state = ST_MENU;
+  drawMenu();
+}
+
+void handleSearchTouch(int tx, int ty) {
+  int len = strlen(searchBuf);
+  for (int i = 0; i < KB_KEYS; i++) {
+    int x, y;
+    kbKeyPos(i, x, y);
+    if (!inBox(tx, ty, x, y, KB_KW, KB_KH)) continue;
+    if (len < (int)sizeof(searchBuf) - 1) {
+      searchBuf[len] = kbChars[i];
+      searchBuf[len + 1] = 0;
+      drawSearchField();
+    }
+    return;
+  }
+  for (int i = 0; i < 3; i++) {
+    if (!inBox(tx, ty, 4 + i * (KB_ACT_W + KB_GAP), KB_ACT_Y, KB_ACT_W, KB_ACT_H)) continue;
+    if (i == 0 && len > 0) searchBuf[len - 1] = 0;
+    if (i == 1) clearSearch();
+    if (i == 2) closeSearch();
+    else drawSearchField();
+    return;
   }
 }
 
@@ -559,7 +705,12 @@ void handleBack() {
       pinBackspace();
       break;
     case ST_MENU:
-      lockDevice();
+      // Com filtro ativo, "voltar" limpa a busca antes de bloquear
+      if (searchBuf[0]) { clearSearch(); drawMenu(); }
+      else lockDevice();
+      break;
+    case ST_SEARCH:
+      closeSearch();
       break;
     case ST_DETAIL:
       state = ST_MENU;
@@ -575,7 +726,7 @@ void handleBack() {
 void lockDevice() {
   clearMemory();
   clearPinBuffers();
-  menuTop = 0;
+  clearSearch();
   state = ST_PIN_ENTRY;
   drawPinScreen("Digite PIN");
 }
@@ -638,7 +789,7 @@ void loop() {
     return;
   }
 
-  if ((state == ST_MENU || state == ST_DETAIL) && millis() - lastAction > AUTOLOCK_MS) {
+  if ((state == ST_MENU || state == ST_DETAIL || state == ST_SEARCH) && millis() - lastAction > AUTOLOCK_MS) {
     lockDevice();
     return;
   }
@@ -673,6 +824,9 @@ void loop() {
       break;
     case ST_WEB:
       handleWebTouch(tx, ty);
+      break;
+    case ST_SEARCH:
+      handleSearchTouch(tx, ty);
       break;
   }
 }
