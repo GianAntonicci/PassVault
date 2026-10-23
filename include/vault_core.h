@@ -5,6 +5,7 @@
 #include <mbedtls/aes.h>
 #include <mbedtls/sha256.h>
 #include <mbedtls/pkcs5.h>
+#include <mbedtls/md.h>
 #include <mbedtls/platform_util.h>
 #include "config.h"
 
@@ -61,7 +62,7 @@ String hashPinV1(const char* pin) {
   return hex;
 }
 
-String encryptData(const char* plain) {
+String encryptData(const char* plain, const uint8_t* key = aesKey) {
   size_t pLen = strlen(plain);
   uint8_t pad = 16 - (pLen % 16);
   size_t  bLen = pLen + pad;
@@ -74,7 +75,7 @@ String encryptData(const char* plain) {
 
   mbedtls_aes_context aes;
   mbedtls_aes_init(&aes);
-  mbedtls_aes_setkey_enc(&aes, aesKey, 256);
+  mbedtls_aes_setkey_enc(&aes, key, 256);
   uint8_t ivCopy[16];
   memcpy(ivCopy, iv, 16);
   mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_ENCRYPT, bLen, ivCopy, buf, buf);
@@ -92,7 +93,7 @@ String encryptData(const char* plain) {
   return hex;
 }
 
-String decryptData(const String& hexData) {
+String decryptData(const String& hexData, const uint8_t* key = aesKey) {
   if (hexData.length() < 34) return "";
   size_t totalBytes = hexData.length() / 2;
   uint8_t* raw = (uint8_t*)malloc(totalBytes);
@@ -107,7 +108,7 @@ String decryptData(const String& hexData) {
 
   mbedtls_aes_context aes;
   mbedtls_aes_init(&aes);
-  mbedtls_aes_setkey_dec(&aes, aesKey, 256);
+  mbedtls_aes_setkey_dec(&aes, key, 256);
   mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_DECRYPT, cLen, iv, cipher, cipher);
   mbedtls_aes_free(&aes);
 
@@ -353,6 +354,128 @@ bool deleteCredential(int idx) {
   char key[4]; sprintf(key, "c%d", credCount);
   prefs.remove(key);
   return true;
+}
+
+// ---- Backup (exportar/importar) ----
+// Arquivo JSON independente do PIN e do aparelho:
+//   bmaster = PBKDF2-HMAC-SHA256(senha do backup, bsalt, iter)
+//   chave = SHA-256(bmaster||"bkey"), verificador = SHA-256(bmaster||"bver"),
+//   chave do MAC = SHA-256(bmaster||"bmac"); MAC = HMAC(salt + "," + c0 + "," + c1 ...)
+// Cada credencial: "name|user|pass" -> AES-256-CBC (IV aleatorio) -> hex
+
+#define BACKUP_ITERS_MIN  1000
+#define BACKUP_ITERS_MAX  200000
+
+String bytesToHex(const uint8_t* b, size_t n) {
+  String hex = "";
+  for (size_t i = 0; i < n; i++) { char t[3]; sprintf(t, "%02x", b[i]); hex += t; }
+  return hex;
+}
+
+bool hexToBytes(const String& hex, uint8_t* out, size_t n) {
+  if (hex.length() != n * 2) return false;
+  for (size_t i = 0; i < n; i++) {
+    char h[3] = { hex[i*2], hex[i*2+1], 0 };
+    if (!isxdigit(h[0]) || !isxdigit(h[1])) return false;
+    out[i] = strtoul(h, NULL, 16);
+  }
+  return true;
+}
+
+void deriveBackupKeys(const char* pw, const uint8_t* bsalt, int iters,
+                      uint8_t* key, uint8_t* ver, uint8_t* macKey) {
+  uint8_t master[32];
+  mbedtls_pkcs5_pbkdf2_hmac_ext(MBEDTLS_MD_SHA256,
+                                (const uint8_t*)pw, strlen(pw),
+                                bsalt, 16, iters, sizeof(master), master);
+  sha256Tagged(master, 32, "bkey", key);
+  sha256Tagged(master, 32, "bver", ver);
+  sha256Tagged(master, 32, "bmac", macKey);
+  mbedtls_platform_zeroize(master, sizeof(master));
+}
+
+void backupMac(const uint8_t* macKey, const String& saltHex,
+               const String* entries, int n, uint8_t* out) {
+  mbedtls_md_context_t ctx;
+  mbedtls_md_init(&ctx);
+  mbedtls_md_setup(&ctx, mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), 1);
+  mbedtls_md_hmac_starts(&ctx, macKey, 32);
+  mbedtls_md_hmac_update(&ctx, (const uint8_t*)saltHex.c_str(), saltHex.length());
+  for (int i = 0; i < n; i++) {
+    mbedtls_md_hmac_update(&ctx, (const uint8_t*)",", 1);
+    mbedtls_md_hmac_update(&ctx, (const uint8_t*)entries[i].c_str(), entries[i].length());
+  }
+  mbedtls_md_hmac_finish(&ctx, out);
+  mbedtls_md_free(&ctx);
+}
+
+// Gera o JSON do backup com todas as credenciais
+String exportBackup(const char* pw) {
+  uint8_t bsalt[16], key[32], ver[32], macKey[32], mac[32];
+  esp_fill_random(bsalt, 16);
+  deriveBackupKeys(pw, bsalt, KDF_ITERS, key, ver, macKey);
+  String saltHex = bytesToHex(bsalt, 16);
+
+  static String entries[MAX_CREDS];
+  for (int i = 0; i < credCount; i++) {
+    String plain = String(creds[i].name) + "|" + creds[i].user + "|" + creds[i].pass;
+    entries[i] = encryptData(plain.c_str(), key);
+    mbedtls_platform_zeroize((void*)plain.c_str(), plain.length());
+  }
+  backupMac(macKey, saltHex, entries, credCount, mac);
+
+  String json = "{\"app\":\"PassVault\",\"v\":1,\"iter\":" + String(KDF_ITERS) +
+                ",\"salt\":\"" + saltHex + "\",\"ver\":\"" + bytesToHex(ver, 32) +
+                "\",\"mac\":\"" + bytesToHex(mac, 32) + "\",\"creds\":[";
+  for (int i = 0; i < credCount; i++) {
+    if (i) json += ",";
+    json += "\"" + entries[i] + "\"";
+    entries[i] = "";
+  }
+  json += "]}";
+  mbedtls_platform_zeroize(key, 32);
+  mbedtls_platform_zeroize(macKey, 32);
+  return json;
+}
+
+// Importa credenciais de um backup, ignorando duplicadas (mesmo nome+usuario).
+// Retorno: >=0 adicionadas, -1 senha errada, -2 arquivo invalido/alterado
+int importBackup(const char* pw, int iters, const String& saltHex, const String& verHex,
+                 const String& macHex, const String* entries, int n, int* skipped) {
+  uint8_t bsalt[16], fver[32], fmac[32], key[32], ver[32], macKey[32], mac[32];
+  *skipped = 0;
+  if (iters < BACKUP_ITERS_MIN || iters > BACKUP_ITERS_MAX || n < 0 ||
+      !hexToBytes(saltHex, bsalt, 16) || !hexToBytes(verHex, fver, 32) ||
+      !hexToBytes(macHex, fmac, 32)) return -2;
+
+  deriveBackupKeys(pw, bsalt, iters, key, ver, macKey);
+  int result = 0;
+  if (!ctEqual(ver, fver, 32)) { result = -1; goto done; }
+  backupMac(macKey, saltHex, entries, n, mac);
+  if (!ctEqual(mac, fmac, 32)) { result = -2; goto done; }
+
+  for (int i = 0; i < n; i++) {
+    String plain = decryptData(entries[i], key);
+    int p1 = plain.indexOf('|');
+    int p2 = plain.indexOf('|', p1 + 1);
+    if (p1 > 0 && p2 > p1) {
+      String name = plain.substring(0, p1), user = plain.substring(p1 + 1, p2);
+      String pass = plain.substring(p2 + 1);
+      bool dup = false;
+      for (int j = 0; j < credCount && !dup; j++)
+        dup = name == creds[j].name && user == creds[j].user;
+      if (dup || !addCredential(name.c_str(), user.c_str(), pass.c_str())) (*skipped)++;
+      else result++;
+      mbedtls_platform_zeroize((void*)pass.c_str(), pass.length());
+    } else {
+      (*skipped)++;
+    }
+    mbedtls_platform_zeroize((void*)plain.c_str(), plain.length());
+  }
+done:
+  mbedtls_platform_zeroize(key, 32);
+  mbedtls_platform_zeroize(macKey, 32);
+  return result;
 }
 
 void clearMemory() {

@@ -83,6 +83,7 @@ input:focus{outline:none;border-color:#0ff}
              border-radius:10px;padding:16px;margin-bottom:14px}
 .detail-area .field{margin:8px 0}
 .detail-area .label{color:#0ff;font-size:.8em}
+.backup{margin-top:18px;padding-top:12px;border-top:1px solid #333}
 .pass-row{display:flex;gap:6px;align-items:center}
 .pass-row input{flex:1}
 .btn-gen{background:#a60;color:#fff;margin:6px 0}
@@ -129,6 +130,14 @@ input:focus{outline:none;border-color:#0ff}
 </div>
 <div id="list"></div>
 <button class="btn-add" onclick="openAdd()">+ Nova Credencial</button>
+<div class="backup">
+  <input type="password" id="b-pw" placeholder="Senha do backup (m&iacute;n. 8)" maxlength="64">
+  <div style="text-align:center">
+    <button class="btn btn-cancel" onclick="doExport()">Exportar</button>
+    <button class="btn btn-cancel" onclick="document.getElementById('b-file').click()">Importar</button>
+  </div>
+  <input type="file" id="b-file" accept=".json,application/json" style="display:none" onchange="doImport(this)">
+</div>
 <script>
 let selId=-1;
 function msg(t,ok){const m=document.getElementById('msg');m.textContent=t;
@@ -203,6 +212,30 @@ function saveCred(){
     .then(r=>r.json()).then(d=>{msg(d.ok?'Salvo':'Erro',d.ok);closeForm();load();
   }).catch(()=>msg('Erro',false));
 }
+function backupPw(){const p=document.getElementById('b-pw').value;
+  if(p.length<8){msg('Senha do backup: m\u00ednimo 8 caracteres',false);return null}return p}
+function doExport(){const p=backupPw();if(!p)return;msg('Gerando...',true);
+  fetch('/api/export',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
+    body:'pw='+encodeURIComponent(p)}).then(r=>{if(!r.ok)throw 0;return r.blob()}).then(b=>{
+    const a=document.createElement('a');a.href=URL.createObjectURL(b);
+    a.download='passvault-backup-'+new Date().toISOString().slice(0,10)+'.json';
+    document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(a.href);
+    msg('Backup exportado',true)}).catch(()=>msg('Erro ao exportar',false));
+}
+function doImport(inp){const f=inp.files[0];inp.value='';if(!f)return;
+  const p=backupPw();if(!p)return;
+  f.text().then(t=>{const j=JSON.parse(t);
+    if(j.app!=='PassVault'||j.v!==1||!Array.isArray(j.creds))throw 0;
+    let body='pw='+encodeURIComponent(p)+'&iter='+j.iter+'&salt='+j.salt+'&ver='+j.ver+
+      '&mac='+j.mac+'&n='+j.creds.length;
+    j.creds.forEach((c,i)=>body+='&c'+i+'='+encodeURIComponent(c));
+    msg('Importando...',true);
+    return fetch('/api/import',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body})
+  }).then(r=>r.json()).then(d=>{
+    if(d.ok){msg(d.added+' importada(s), '+d.skipped+' ignorada(s)',true);load()}
+    else msg(d.err==='pw'?'Senha do backup incorreta':'Arquivo inv\u00e1lido',false);
+  }).catch(()=>msg('Arquivo inv\u00e1lido',false));
+}
 load();
 </script>
 </body>
@@ -267,6 +300,40 @@ void handleDel() {
   server.send(200, "application/json", ok ? "{\"ok\":true}" : "{\"ok\":false}");
 }
 
+void handleExport() {
+  webTouch();
+  String pw = server.arg("pw");
+  if (pw.length() < 8) { server.send(400, "application/json", "{\"ok\":false}"); return; }
+  String json = exportBackup(pw.c_str());
+  mbedtls_platform_zeroize((void*)pw.c_str(), pw.length());
+  server.sendHeader("Content-Disposition", "attachment; filename=\"passvault-backup.json\"");
+  server.send(200, "application/json", json);
+}
+
+void handleImport() {
+  webTouch();
+  String pw = server.arg("pw");
+  int n = server.arg("n").toInt();
+  if (pw.length() < 8 || n < 0 || n > MAX_CREDS) {
+    server.send(400, "application/json", "{\"ok\":false,\"err\":\"file\"}");
+    return;
+  }
+  static String entries[MAX_CREDS];
+  for (int i = 0; i < n; i++) entries[i] = server.arg("c" + String(i));
+  int skipped = 0;
+  int r = importBackup(pw.c_str(), server.arg("iter").toInt(), server.arg("salt"),
+                       server.arg("ver"), server.arg("mac"), entries, n, &skipped);
+  for (int i = 0; i < n; i++) entries[i] = "";
+  mbedtls_platform_zeroize((void*)pw.c_str(), pw.length());
+  if (r < 0) {
+    server.send(200, "application/json", r == -1 ? "{\"ok\":false,\"err\":\"pw\"}"
+                                                 : "{\"ok\":false,\"err\":\"file\"}");
+    return;
+  }
+  server.send(200, "application/json", "{\"ok\":true,\"added\":" + String(r) +
+                                       ",\"skipped\":" + String(skipped) + "}");
+}
+
 // ---- Start / Stop / Tick ----
 
 // Senha aleatoria sem caracteres ambiguos (0/O, 1/l/I)
@@ -286,6 +353,8 @@ void startWeb() {
   server.on("/api/get",   handleGet);
   server.on("/api/save",  HTTP_POST, handleSave);
   server.on("/api/del",   HTTP_POST, handleDel);
+  server.on("/api/export", HTTP_POST, handleExport);
+  server.on("/api/import", HTTP_POST, handleImport);
   server.begin();
   webRunning = true;
 }
