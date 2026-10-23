@@ -14,6 +14,9 @@ It is a PlatformIO project with one firmware and a build environment for each su
 - **Encrypted storage:** each credential is AES-256-CBC encrypted with a random IV and stored in NVS flash.
 - **Auto-typing:** each credential offers *All* (user + TAB + password), *Login* (user only) or *Password* (password only).
 - **Wi-Fi management:** an on-demand Wi-Fi access point with a single-page web app to list, add, edit and delete credentials. Each time it is turned on it gets a **new random password**, accepts only one client, and shuts down after 5 minutes without use.
+- **Search by name:** filter the menu list with an on-screen A–Z/0–9 keyboard. Matching ignores case and finds the text anywhere in the name.
+- **Password generator:** the web UI creates random passwords with a chosen length and character types.
+- **Encrypted backup:** export all credentials to a JSON file protected by a backup password, and import them again on the same or another device.
 - **Up to 30 credentials:** name ≤ 32 chars, user ≤ 64, password ≤ 64.
 - **Several boards:** portrait and landscape layouts, capacitive, resistive or button-only input, and a USB or BLE keyboard.
 
@@ -117,7 +120,7 @@ Credentials can be lost in these cases:
 - You run `-t erase`.
 - You flash a different board environment that uses another layout.
 
-There is no export feature, so before such changes, copy important credentials from the web UI and keep them somewhere safe.
+Before such changes, **export a backup** from the web UI (see [Backup](#backup-export--import)) and import it again afterwards.
 
 ### 8. Resetting the vault
 
@@ -152,13 +155,22 @@ On the button board, the focused button has a **cyan outline**. A short press on
 | PIN | Deletes the last digit |
 | Detail | Goes back to the menu |
 | Wi-Fi | Turns Wi-Fi off |
-| Menu | Locks the device |
+| Search | Closes the keyboard and keeps the filter |
+| Menu | Clears the search if a filter is active, otherwise locks the device |
 
 ### Unlocking
 
 1. Enter your PIN on the numpad. **C** clears everything and **<** deletes the last digit.
 2. When the last digit is entered, the device checks the PIN automatically. "Verificando..." stays on screen briefly.
 3. A wrong PIN shows "PIN errado (n/5)". See [Wrong-PIN limit](#security-model) for what happens after repeated errors. **On the 10th wrong PIN in a row, the vault is erased.**
+
+### Searching by name
+
+1. In the menu, tap the **Buscar...** field.
+2. Type part of the name on the on-screen keyboard (A–Z, 0–9). The field shows how many credentials match.
+3. **<** deletes the last character, **Limpar** clears the search, and **OK** goes back to the filtered list.
+
+Matching ignores case and finds the text anywhere in the name, so `MAIL` matches *Gmail* and *Hotmail*. While a filter is active, the menu shows only matching credentials, or "Nada encontrado" if there are none. To clear the filter, open the search and tap **Limpar**, or press **Voltar** in the menu (hold GPIO14 on the button board). The search is also cleared when the device locks.
 
 ### Typing a credential
 
@@ -189,7 +201,21 @@ The device does **not** press Enter, so you submit the form yourself. This avoid
 | View | Tap a credential in the list. The password is shown in plain text |
 | Edit | Open it → **Editar** → change the fields → **Salvar** |
 | Delete | Open it → **Excluir** → confirm |
+| Generate a password | In the add/edit form, set the length and character types, then tap **Gerar** |
 | Cancel / back | **Cancelar** / **Voltar** |
+
+**Password generator**
+
+The **Gerar** button next to the password field fills it with a random password. The options below the field are:
+
+| Option | Default | Effect |
+|---|---|---|
+| *Tamanho* | 16 | Length, from 4 to 64 |
+| *A-Z* | on | Upper-case letters |
+| *0-9* | on | Digits |
+| *Símbolos* | on | `!@#$%&*()-_=+[]{};:,.<>?/` |
+
+Lower-case letters are always used, and the password contains at least one character of every selected type. The browser's secure random generator (`crypto.getRandomValues`) is used without modulo bias. The symbol set leaves out quotes, `` ` ``, `\`, `|`, `^` and `~`, which can be stored or typed incorrectly (`^` and `~` are dead keys on US International).
 
 **Limits**
 
@@ -201,6 +227,27 @@ The device does **not** press Enter, so you submit the form yourself. This avoid
 | Credentials | 30 in total |
 
 When the vault is full, new credentials are not saved.
+
+### Backup (export & import)
+
+At the bottom of the web UI, type a **backup password** (at least 8 characters) in *Senha do backup*, then:
+
+- **Exportar** downloads `passvault-backup-YYYY-MM-DD.json` with all credentials.
+- **Importar** asks for a backup file and decrypts it with the password in the field.
+
+Imported credentials are **added** to the vault. A credential with the same name and username as an existing one is skipped, and so is anything past the 30-credential limit. The page reports how many were imported and how many were skipped. A wrong password shows "Senha do backup incorreta". A damaged or modified file shows "Arquivo inválido".
+
+The backup password is separate from the PIN, so a backup can be restored after changing the PIN, after a vault wipe, or on another board. The encryption runs on the device, because browsers block Web Crypto on plain-HTTP pages. The file format is:
+
+```json
+{"app":"PassVault","v":1,"iter":20000,"salt":"<hex>","ver":"<hex>","mac":"<hex>","creds":["<hex>", "..."]}
+```
+
+- The backup key is derived with **PBKDF2-HMAC-SHA256** (`iter` rounds) from the backup password and a new random 16-byte `salt` on each export.
+- Each `creds` entry is `name|user|pass`, encrypted with **AES-256-CBC** and a random IV (IV + ciphertext, hex).
+- `ver` checks the password, and `mac` (**HMAC-SHA256** over the salt and all entries) detects a damaged or modified file.
+
+> Anyone who has the file can try to guess the backup password offline. Use a long, unique password and keep the file somewhere safe.
 
 When you are done, tap **Desligar WiFi** on the device. If you forget, Wi-Fi turns off and the device locks after **5 minutes** without use.
 
@@ -222,7 +269,7 @@ When the device locks, the encryption key and all decrypted credentials are wipe
 - **Keyboard layout:** set the computer's keyboard layout to **US** (or US International without dead keys). The device sends US key codes. With another layout, for example ABNT2 or AZERTY, symbols such as `@ " ; / ?` can come out as different characters.
 - **ASCII only:** use letters, digits and standard symbols. Accented characters (`á ç ã`), emoji and other non-ASCII characters **cannot be typed**. Avoid them in usernames and passwords.
 - **Check the focus first:** the device types into whatever window has focus.
-- **Back up your credentials.** There is no export or backup feature. If the vault is erased (10 wrong PINs, `-t erase`) the credentials are gone. Keep a separate copy of critical ones.
+- **Back up your credentials.** If the vault is erased (10 wrong PINs, `-t erase`), the credentials are gone. Export a [backup](#backup-export--import) regularly.
 
 ### Screen text reference (Portuguese → English)
 
@@ -237,11 +284,16 @@ When the device locks, the encryption key and all decrypted credentials are wipe
 | Apaga apos N erros | Erased after N more errors |
 | VAULT APAGADO | Vault erased |
 | Nenhuma credencial | No credentials |
+| Buscar... / Buscar | Search |
+| Limpar / OK | Clear / OK |
+| Nada encontrado | No matches |
 | WiFi / Bloquear | Wi-Fi / Lock |
 | Usuario / Senha | Username / Password |
 | Tudo / Login / Senha / Voltar | All / Username / Password / Back |
 | WiFi Ativo / Desligar WiFi | Wi-Fi on / Turn off Wi-Fi |
 | Web: Nova Credencial, Nome, Salvar, Editar, Excluir, Cancelar | New credential, Name, Save, Edit, Delete, Cancel |
+| Web: Gerar, Tamanho, Símbolos | Generate, Length, Symbols |
+| Web: Senha do backup, Exportar, Importar | Backup password, Export, Import |
 
 ---
 
@@ -263,6 +315,8 @@ When the device locks, the encryption key and all decrypted credentials are wipe
                                                    ┌────────┐ ┌──────────┐
                                                    │ Detail │ │ Wi-Fi AP │
                                                    └────────┘ └──────────┘
+
+Menu ──► Search (tap "Buscar...") ──► OK ──► Menu (filtered)
 ```
 
 - **PIN screens:** a numpad with digits, `C` (clear) and `<` (backspace).
@@ -361,6 +415,8 @@ const char* kbdLabel();
 | GET | `/api/get` | Get one credential |
 | POST | `/api/save` | Add or update a credential |
 | POST | `/api/del` | Delete a credential |
+| POST | `/api/export` | Download an encrypted backup (`pw` = backup password) |
+| POST | `/api/import` | Import a backup (`pw`, `iter`, `salt`, `ver`, `mac`, `n`, `c0`…`cN`) |
 
 ---
 
