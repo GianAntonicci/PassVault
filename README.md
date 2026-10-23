@@ -81,6 +81,7 @@ pio device monitor                           # optional, 115200 baud
 
 **Notes**
 
+- **Upload to a single board:** always pass `-e <env>`, for example `pio run -e tdisplay-s3-touch --target upload` (`-t` is short for `--target`). Without `-e`, PlatformIO builds and tries to upload **every** environment in `platformio.ini`.
 - **Multiple serial ports:** if several ports are connected, choose one with `--upload-port /dev/cu.usbmodem1101` (on Windows, `COM5`), or set `upload_port` in the env.
 - **T-Display S3 upload fails:** because the board runs as a USB keyboard, its serial port may not respond. Put it in download mode by holding **BOOT**, pressing and releasing **RST**, then releasing **BOOT**, and upload again. Press **RST** after flashing to start the firmware.
 - **Classic ESP32 upload fails** with "Failed to connect": hold **BOOT** while the upload says `Connecting....`.
