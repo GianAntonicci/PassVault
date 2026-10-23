@@ -83,6 +83,14 @@ input:focus{outline:none;border-color:#0ff}
              border-radius:10px;padding:16px;margin-bottom:14px}
 .detail-area .field{margin:8px 0}
 .detail-area .label{color:#0ff;font-size:.8em}
+.pass-row{display:flex;gap:6px;align-items:center}
+.pass-row input{flex:1}
+.btn-gen{background:#a60;color:#fff;margin:6px 0}
+.btn-gen:hover{background:#c80}
+.gen-opts{font-size:.85em;color:#aaa;margin:4px 0 6px;display:flex;flex-wrap:wrap;
+          gap:4px 12px;align-items:center}
+.gen-opts input[type=checkbox]{width:auto;margin:0 4px 0 0}
+.gen-opts input[type=number]{width:60px;padding:4px;margin:0 0 0 4px}
 .detail-area .value{color:#eee;font-size:1em;word-break:break-all;
                      background:#222;padding:8px;border-radius:6px;margin-top:2px}
 </style>
@@ -103,7 +111,16 @@ input:focus{outline:none;border-color:#0ff}
 <div id="form-area">
   <input id="f-name" placeholder="Nome (ex: Gmail)" maxlength="32">
   <input id="f-user" placeholder="Usu&aacute;rio / Email" maxlength="64">
-  <input id="f-pass" placeholder="Senha" maxlength="64">
+  <div class="pass-row">
+    <input id="f-pass" placeholder="Senha" maxlength="64">
+    <button class="btn btn-gen" onclick="genPass()">Gerar</button>
+  </div>
+  <div class="gen-opts">
+    <label>Tamanho<input type="number" id="g-len" min="4" max="64" value="16"></label>
+    <label><input type="checkbox" id="g-up" checked>A-Z</label>
+    <label><input type="checkbox" id="g-num" checked>0-9</label>
+    <label><input type="checkbox" id="g-sym" checked>S&iacute;mbolos</label>
+  </div>
   <input type="hidden" id="f-id" value="-1">
   <div style="text-align:center;margin-top:8px">
     <button class="btn btn-ok" onclick="saveCred()">Salvar</button>
@@ -158,6 +175,20 @@ function openAdd(){
   document.getElementById('f-id').value=-1;
   document.getElementById('form-area').style.display='block';
   document.getElementById('detail').style.display='none';
+}
+function rndInt(n){const lim=Math.floor(4294967296/n)*n,b=new Uint32Array(1);
+  do{crypto.getRandomValues(b)}while(b[0]>=lim);return b[0]%n}
+function genPass(){
+  let len=parseInt(document.getElementById('g-len').value)||16;
+  len=Math.max(4,Math.min(64,len));document.getElementById('g-len').value=len;
+  const sets=['abcdefghijklmnopqrstuvwxyz'];
+  if(document.getElementById('g-up').checked)sets.push('ABCDEFGHIJKLMNOPQRSTUVWXYZ');
+  if(document.getElementById('g-num').checked)sets.push('0123456789');
+  if(document.getElementById('g-sym').checked)sets.push('!@#$%&*()-_=+[]{};:,.<>?/');
+  const all=sets.join(''),out=sets.map(s=>s[rndInt(s.length)]);
+  while(out.length<len)out.push(all[rndInt(all.length)]);
+  for(let i=out.length-1;i>0;i--){const j=rndInt(i+1);[out[i],out[j]]=[out[j],out[i]]}
+  document.getElementById('f-pass').value=out.join('');
 }
 function closeForm(){document.getElementById('form-area').style.display='none'}
 function saveCred(){
