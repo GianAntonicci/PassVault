@@ -186,6 +186,8 @@ Matching ignores case and finds the text anywhere in the name, so `MAIL` matches
 | **Senha** | password only | Password-only prompts, or the second step of a two-step login |
 | **Voltar** | — | Back to the menu |
 
+Use **Revelar** on the detail screen to display the password for **3 seconds**. It is then masked automatically; pressing the button again restarts the timer. Leaving the screen also hides the password. Long passwords wrap to fit the display.
+
 The device does **not** press Enter, so you submit the form yourself. This avoids sending a password to the wrong window by accident.
 
 **BLE boards:** typing only works while the `BLE` label in the menu is **green** (a host is connected). When it is grey, nothing is sent.
