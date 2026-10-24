@@ -27,6 +27,9 @@ int  pinPos   = 0;
 int  pinLen   = PIN_LEN;   // vault novo usa PIN_LEN; vault existente, o tamanho salvo
 int  selCred  = 0;
 int  menuTop  = 0;
+bool detailPasswordVisible = false;
+unsigned long detailPasswordShownAt = 0;
+const unsigned long DETAIL_REVEAL_MS = 3000;
 
 // Busca por nome: filtro aplicado a lista do menu
 char searchBuf[33] = "";
@@ -391,6 +394,7 @@ void clearSearch() {
 }
 
 void drawMenu() {
+  detailPasswordVisible = false;
   focusBegin(ST_MENU);
   applyFilter();
   tft.fillScreen(C_BG);
@@ -594,8 +598,9 @@ void typeCredential(int mode) {
   }
 }
 
-// Botoes do detalhe: 0=Tudo 1=Login 2=Senha 3=Voltar
-// Portrait: grade 2x2 | Landscape: uma linha no rodape
+// Botoes do detalhe: 0=Tudo 1=Login 2=Senha 3=Voltar 4=Revelar
+// Revelar: abaixo da grade no portrait, acima do rodape no landscape.
+#define DET_BTN_COUNT 5
 #define DET_BTN_H  38
 #define DET_GAP    8
 #ifdef USE_LANDSCAPE
@@ -605,6 +610,15 @@ void typeCredential(int mode) {
 #endif
 
 void detailBtnPos(int i, int &x, int &y) {
+  if (i == 4) {
+    x = (SCR_W - DET_BTN_W) / 2;
+#ifdef USE_LANDSCAPE
+    y = 150;
+#else
+    y = 262;
+#endif
+    return;
+  }
 #ifdef USE_LANDSCAPE
   x = DET_GAP + i * (DET_BTN_W + DET_GAP);
   y = SCR_H - DET_BTN_H - 6;
@@ -615,10 +629,24 @@ void detailBtnPos(int i, int &x, int &y) {
 #endif
 }
 
-const char* detLabels[4] = {"Tudo", "Login", "Senha", "Voltar"};
-const uint16_t detColors[4] = {C_OK, C_ACCENT, C_ACCENT, C_DIM};
+const char* detLabels[DET_BTN_COUNT] = {"Tudo", "Login", "Senha", "Voltar", "Revelar"};
+const uint16_t detColors[DET_BTN_COUNT] = {C_OK, C_ACCENT, C_ACCENT, C_DIM, C_ACCENT};
+
+void drawDetailPassword() {
+  // Fonte de 6x8: ate 64 caracteres cabem em 3 linhas no portrait.
+  // Limpa toda a area para remover tambem as linhas da senha revelada.
+  tft.fillRect(0, 120, SCR_W, 24, C_BG);
+  tft.setTextColor(C_TEXT, C_BG);
+  const int cols = (SCR_W - 20) / 6;
+  const char* pass = creds[selCred].pass;
+  for (int i = 0; pass[i] && i < 64; i++) {
+    tft.drawChar(detailPasswordVisible ? pass[i] : '*',
+                 10 + (i % cols) * 6, 120 + (i / cols) * 8, 1);
+  }
+}
 
 void drawDetail() {
+  detailPasswordVisible = false;
   focusBegin(ST_DETAIL);
   tft.fillScreen(C_BG);
   tft.setTextColor(C_ACCENT);
@@ -633,12 +661,9 @@ void drawDetail() {
 
   tft.setTextColor(C_DIM);
   tft.drawString("Senha:", 10, 100, 2);
-  tft.setTextColor(C_TEXT);
-  String masked = "";
-  for (int i = 0; i < (int)strlen(creds[selCred].pass); i++) masked += "*";
-  tft.drawString(masked, 10, 120, 2);
+  drawDetailPassword();
 
-  for (int i = 0; i < 4; i++) {
+  for (int i = 0; i < DET_BTN_COUNT; i++) {
     int x, y;
     detailBtnPos(i, x, y);
     btn(x, y, DET_BTN_W, DET_BTN_H, detLabels[i], detColors[i]);
@@ -647,12 +672,16 @@ void drawDetail() {
 }
 
 void handleDetailTouch(int tx, int ty) {
-  for (int i = 0; i < 4; i++) {
+  for (int i = 0; i < DET_BTN_COUNT; i++) {
     int x, y;
     detailBtnPos(i, x, y);
     if (!inBox(tx, ty, x, y, DET_BTN_W, DET_BTN_H)) continue;
     if (i < 3) {
       typeCredential(i);
+    } else if (i == 4) {
+      detailPasswordVisible = true;
+      detailPasswordShownAt = millis();
+      drawDetailPassword();
     } else {
       state = ST_MENU;
       drawMenu();
@@ -724,6 +753,7 @@ void handleBack() {
 
 // ---- Lock ----
 void lockDevice() {
+  detailPasswordVisible = false;
   clearMemory();
   clearPinBuffers();
   clearSearch();
@@ -767,6 +797,14 @@ void setup() {
 
 // ===================== LOOP =====================
 void loop() {
+  // Sem delay: o dispositivo continua respondendo durante os 3 segundos.
+  // Subtracao sem sinal mantem o prazo correto mesmo quando millis() transborda.
+  if (state == ST_DETAIL && detailPasswordVisible &&
+      millis() - detailPasswordShownAt >= DETAIL_REVEAL_MS) {
+    detailPasswordVisible = false;
+    drawDetailPassword();
+  }
+
   if (lockoutEnd > 0 && millis() < lockoutEnd) {
     // Contagem regressiva, 1x por segundo
     if (millis() - lockoutTick >= 1000) {
