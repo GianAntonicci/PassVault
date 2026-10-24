@@ -80,6 +80,7 @@ pio device monitor                           # optional, 115200 baud
 | T-Display S3 Touch | `tdisplay-s3-touch` |
 | T-Display S3 (no touch) | `tdisplay-s3` |
 | CYD ESP32-2432S028 | `cyd-2432s028` |
+| CYD ESP32-2432S028 with ST7789 (micro-USB + USB-C variant) | `cyd-2432s028-2usb` |
 | Generic ESP32 + ILI9341 | `generic-ili9341` |
 
 **Notes**
@@ -455,6 +456,7 @@ The focused button has a cyan outline. In the menu, moving past the first or las
 
   Print `touch.getPoint()` over Serial while touching the corners to find your values. If an axis is mirrored, swap its MIN and MAX.
 - **Display variants:** some CYD revisions need `-DILI9341_2_DRIVER=1` instead of `-DILI9341_DRIVER=1`, or need `-DTFT_INVERSION_ON=1`. Use those if the colours look inverted or the image is garbled.
+- **ST7789 variant (often micro-USB + USB-C):** use `pio run -e cyd-2432s028-2usb --target upload`. This profile replaces the ILI9341 driver with ST7789, uses BGR colours and keeps the 320×240 landscape layout and separate touch SPI bus. Either USB connector can be used for flashing. USB connector count alone does not guarantee the panel type; keep `cyd-2432s028` for ILI9341 panels. If only the colours are inverted, change `TFT_INVERSION_OFF` to `TFT_INVERSION_ON` in the ST7789 profile.
 - **Keyboard:** BLE (see [BLE keyboard](#ble-keyboard-classic-esp32-boards)).
 
 ### Generic ESP32 + ILI9341 — `generic-ili9341`
