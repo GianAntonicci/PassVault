@@ -383,8 +383,10 @@ bool nameMatches(const char* name, const char* q) {
 // Refeito a cada desenho: credenciais podem mudar pela web
 void applyFilter() {
   filtCount = 0;
-  for (int i = 0; i < credCount; i++)
+  for (int position = 0; position < credCount; position++) {
+    int i = credentialDisplayIndex(position);
     if (nameMatches(creds[i].name, searchBuf)) filt[filtCount++] = i;
+  }
   if (menuTop > max(0, filtCount - MENU_VISIBLE)) menuTop = max(0, filtCount - MENU_VISIBLE);
 }
 
@@ -422,7 +424,7 @@ void drawMenu() {
       tft.fillRoundRect(4, y, MENU_ITEM_W, MENU_ITEM_H - 2, 4, C_CARD);
       tft.setTextColor(C_TEXT);
       tft.setTextDatum(TL_DATUM);
-      tft.drawString(creds[filt[i]].name, 12, y + 7, 2);
+      tft.drawString(String(creds[filt[i]].favorite ? "* " : "") + creds[filt[i]].name, 12, y + 7, 2);
       // Bordas da lista rolam ao inves de mover o foco
       uint8_t flags = 0;
       if (i == menuTop && menuTop > 0) flags |= FOCUS_SCROLL_UP;
@@ -598,9 +600,9 @@ void typeCredential(int mode) {
   }
 }
 
-// Botoes do detalhe: 0=Tudo 1=Login 2=Senha 3=Voltar 4=Revelar
+// Botoes do detalhe: 0=Tudo 1=Login 2=Senha 3=Voltar 4=Revelar 5=Favoritar
 // Revelar: abaixo da grade no portrait, acima do rodape no landscape.
-#define DET_BTN_COUNT 5
+#define DET_BTN_COUNT 6
 #define DET_BTN_H  38
 #define DET_GAP    8
 #ifdef USE_LANDSCAPE
@@ -610,8 +612,8 @@ void typeCredential(int mode) {
 #endif
 
 void detailBtnPos(int i, int &x, int &y) {
-  if (i == 4) {
-    x = (SCR_W - DET_BTN_W) / 2;
+  if (i >= 4) {
+    x = (SCR_W - 2 * DET_BTN_W - DET_GAP) / 2 + (i - 4) * (DET_BTN_W + DET_GAP);
 #ifdef USE_LANDSCAPE
     y = 150;
 #else
@@ -629,8 +631,8 @@ void detailBtnPos(int i, int &x, int &y) {
 #endif
 }
 
-const char* detLabels[DET_BTN_COUNT] = {"Tudo", "Login", "Senha", "Voltar", "Revelar"};
-const uint16_t detColors[DET_BTN_COUNT] = {C_OK, C_ACCENT, C_ACCENT, C_DIM, C_ACCENT};
+const char* detLabels[DET_BTN_COUNT] = {"Tudo", "Login", "Senha", "Voltar", "Revelar", "Favoritar"};
+const uint16_t detColors[DET_BTN_COUNT] = {C_OK, C_ACCENT, C_ACCENT, C_DIM, C_ACCENT, C_WARN};
 
 void drawDetailPassword() {
   // Fonte de 6x8: ate 64 caracteres cabem em 3 linhas no portrait.
@@ -666,7 +668,8 @@ void drawDetail() {
   for (int i = 0; i < DET_BTN_COUNT; i++) {
     int x, y;
     detailBtnPos(i, x, y);
-    btn(x, y, DET_BTN_W, DET_BTN_H, detLabels[i], detColors[i]);
+    btn(x, y, DET_BTN_W, DET_BTN_H,
+        i == 5 && creds[selCred].favorite ? "Desmarcar" : detLabels[i], detColors[i]);
   }
   focusEnd();
 }
@@ -678,6 +681,10 @@ void handleDetailTouch(int tx, int ty) {
     if (!inBox(tx, ty, x, y, DET_BTN_W, DET_BTN_H)) continue;
     if (i < 3) {
       typeCredential(i);
+    } else if (i == 5) {
+      setCredentialFavorite(selCred, !creds[selCred].favorite);
+      menuTop = 0;
+      drawDetail();
     } else if (i == 4) {
       detailPasswordVisible = true;
       detailPasswordShownAt = millis();

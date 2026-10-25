@@ -10,7 +10,7 @@ using namespace fs;
 // ---- extern from vault_core.h ----
 extern Credential creds[];
 extern int        credCount;
-extern bool addCredential(const char*, const char*, const char*);
+extern bool addCredential(const char*, const char*, const char*, bool);
 extern bool updateCredential(int, const char*, const char*, const char*);
 extern bool deleteCredential(int);
 
@@ -104,6 +104,7 @@ input:focus{outline:none;border-color:#0ff}
   <div class="field"><div class="label">Usu&aacute;rio</div><div class="value" id="d-user"></div></div>
   <div class="field"><div class="label">Senha</div><div class="value" id="d-pass"></div></div>
   <div style="margin-top:12px;text-align:center">
+    <button id="d-favorite" class="btn btn-cancel" onclick="favoriteCred()">Favoritar</button>
     <button class="btn btn-ok" onclick="editCred()">Editar</button>
     <button class="btn btn-del" onclick="delCred()">Excluir</button>
     <button class="btn btn-cancel" onclick="closeDetail()">Voltar</button>
@@ -139,15 +140,15 @@ input:focus{outline:none;border-color:#0ff}
   <input type="file" id="b-file" accept=".json,application/json" style="display:none" onchange="doImport(this)">
 </div>
 <script>
-let selId=-1;
+let selId=-1,selFavorite=false;
 function msg(t,ok){const m=document.getElementById('msg');m.textContent=t;
   m.className=ok?'ok-msg':'err-msg';m.style.display='block';
   setTimeout(()=>m.style.display='none',2500)}
 function load(){
   fetch('/api/list').then(r=>r.json()).then(d=>{
-    let h='';d.forEach((c,i)=>{
-      h+='<div class="card" onclick="showDetail('+i+')"><div class="name">'+
-        esc(c.name)+'</div><div class="user">'+esc(c.user)+'</div></div>';
+    let h='';d.forEach(c=>{
+      h+='<div class="card" onclick="showDetail('+c.id+')"><div class="name">'+
+        (c.favorite?'&#9733; ':'')+esc(c.name)+'</div><div class="user">'+esc(c.user)+'</div></div>';
     });
     document.getElementById('list').innerHTML=h||'<p style="text-align:center;color:#666">Nenhuma credencial</p>';
   }).catch(()=>msg('Erro ao carregar',false));
@@ -155,13 +156,23 @@ function load(){
 function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
 function showDetail(id){
   fetch('/api/get?id='+id).then(r=>r.json()).then(c=>{
-    selId=id;
+    selId=id;selFavorite=c.favorite;
+    document.getElementById('d-favorite').textContent=c.favorite?'Desmarcar favorita':'Favoritar';
+    document.getElementById('d-favorite').setAttribute('aria-pressed',String(c.favorite));
     document.getElementById('d-name').textContent=c.name;
     document.getElementById('d-user').textContent=c.user;
     document.getElementById('d-pass').textContent=c.pass;
     document.getElementById('detail').style.display='block';
     document.getElementById('form-area').style.display='none';
   }).catch(()=>msg('Erro',false));
+}
+function favoriteCred(){
+  const id=selId;
+  fetch('/api/favorite',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
+    body:'id='+id+'&favorite='+(selFavorite?'0':'1')}).then(r=>r.json()).then(d=>{
+      if(!d.ok)throw 0;
+      load();if(selId===id)showDetail(id);
+    }).catch(()=>msg('Erro ao favoritar',false));
 }
 function closeDetail(){document.getElementById('detail').style.display='none';selId=-1}
 function editCred(){
@@ -225,8 +236,8 @@ function doExport(){const p=backupPw();if(!p)return;msg('Gerando...',true);
 function doImport(inp){const f=inp.files[0];inp.value='';if(!f)return;
   const p=backupPw();if(!p)return;
   f.text().then(t=>{const j=JSON.parse(t);
-    if(j.app!=='PassVault'||j.v!==1||!Array.isArray(j.creds))throw 0;
-    let body='pw='+encodeURIComponent(p)+'&iter='+j.iter+'&salt='+j.salt+'&ver='+j.ver+
+    if(j.app!=='PassVault'||(j.v!==1&&j.v!==2)||!Array.isArray(j.creds))throw 0;
+    let body='pw='+encodeURIComponent(p)+'&v='+j.v+'&iter='+j.iter+'&salt='+j.salt+'&ver='+j.ver+
       '&mac='+j.mac+'&n='+j.creds.length;
     j.creds.forEach((c,i)=>body+='&c'+i+'='+encodeURIComponent(c));
     msg('Importando...',true);
@@ -252,9 +263,12 @@ void handleRoot() {
 void handleList() {
   webTouch();
   String json = "[";
-  for (int i = 0; i < credCount; i++) {
-    if (i) json += ",";
-    json += "{\"name\":\"" + jsonEsc(creds[i].name) +
+  for (int position = 0; position < credCount; position++) {
+    int i = credentialDisplayIndex(position);
+    if (position) json += ",";
+    json += "{\"id\":" + String(i) + ",\"favorite\":" +
+            (creds[i].favorite ? "true" : "false") +
+            ",\"name\":\"" + jsonEsc(creds[i].name) +
             "\",\"user\":\"" + jsonEsc(creds[i].user) + "\"}";
   }
   json += "]";
@@ -268,7 +282,8 @@ void handleGet() {
   if (id < 0 || id >= credCount) { server.send(404, "application/json", "{\"ok\":false}"); return; }
   String json = "{\"name\":\"" + jsonEsc(creds[id].name) +
                 "\",\"user\":\"" + jsonEsc(creds[id].user) +
-                "\",\"pass\":\"" + jsonEsc(creds[id].pass) + "\"}";
+                "\",\"pass\":\"" + jsonEsc(creds[id].pass) + "\",\"favorite\":" +
+                (creds[id].favorite ? "true" : "false") + "}";
   server.send(200, "application/json", json);
 }
 
@@ -290,6 +305,27 @@ void handleSave() {
     ok = addCredential(name.c_str(), user.c_str(), pass.c_str());
   }
   server.send(200, "application/json", ok ? "{\"ok\":true}" : "{\"ok\":false}");
+}
+
+void handleFavorite() {
+  webTouch();
+  String idArg = server.arg("id");
+  String value = server.arg("favorite");
+  bool valid = idArg.length() > 0 && (value == "0" || value == "1");
+  for (size_t i = 0; i < idArg.length(); i++)
+    if (!isDigit(idArg[i])) valid = false;
+  // IDs validos tem no maximo dois digitos (MAX_CREDS = 30).
+  if (!valid || idArg.length() > String(MAX_CREDS - 1).length()) {
+    server.send(400, "application/json", "{\"ok\":false}");
+    return;
+  }
+  int id = idArg.toInt();
+  if (id < 0 || id >= credCount) {
+    server.send(404, "application/json", "{\"ok\":false}");
+    return;
+  }
+  bool ok = setCredentialFavorite(id, value == "1");
+  server.send(ok ? 200 : 500, "application/json", ok ? "{\"ok\":true}" : "{\"ok\":false}");
 }
 
 void handleDel() {
@@ -322,7 +358,8 @@ void handleImport() {
   for (int i = 0; i < n; i++) entries[i] = server.arg("c" + String(i));
   int skipped = 0;
   int r = importBackup(pw.c_str(), server.arg("iter").toInt(), server.arg("salt"),
-                       server.arg("ver"), server.arg("mac"), entries, n, &skipped);
+                       server.arg("ver"), server.arg("mac"), entries, n, &skipped,
+                       server.hasArg("v") ? server.arg("v").toInt() : 1);
   for (int i = 0; i < n; i++) entries[i] = "";
   mbedtls_platform_zeroize((void*)pw.c_str(), pw.length());
   if (r < 0) {
@@ -352,6 +389,7 @@ void startWeb() {
   server.on("/api/list",  handleList);
   server.on("/api/get",   handleGet);
   server.on("/api/save",  HTTP_POST, handleSave);
+  server.on("/api/favorite", HTTP_POST, handleFavorite);
   server.on("/api/del",   HTTP_POST, handleDel);
   server.on("/api/export", HTTP_POST, handleExport);
   server.on("/api/import", HTTP_POST, handleImport);

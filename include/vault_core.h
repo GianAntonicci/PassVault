@@ -14,6 +14,7 @@ struct Credential {
   char name[33];
   char user[65];
   char pass[65];
+  bool favorite;
 };
 
 // ---- Globals ----
@@ -171,6 +172,7 @@ bool ctEqual(const uint8_t* a, const uint8_t* b, size_t n) {
 // Chaves NVS: ver (formato), salt2 + pv2 (salt e verificador v2),
 //             plen (tamanho do PIN), fails (tentativas erradas),
 //             cnt, c0..cN (credenciais cifradas), m0..mN (temporarias da migracao)
+//             f0..fN (favoritas; ausente = false),
 //             salt + pin (formato v1, so em vaults antigos)
 
 #define VAULT_FORMAT  2
@@ -300,12 +302,16 @@ void saveSingleCred(int idx) {
   char key[4];
   sprintf(key, "c%d", idx);
   prefs.putString(key, enc);
+  sprintf(key, "f%d", idx);
+  prefs.putBool(key, creds[idx].favorite);
 }
 
 void loadCredentials() {
   credCount = prefs.getInt("cnt", 0);
   for (int i = 0; i < credCount; i++) {
     char key[4];
+    sprintf(key, "f%d", i);
+    creds[i].favorite = prefs.getBool(key, false);
     sprintf(key, "c%d", i);
     String enc = prefs.getString(key, "");
     if (enc.length() == 0) continue;
@@ -323,11 +329,12 @@ void loadCredentials() {
   }
 }
 
-bool addCredential(const char* name, const char* user, const char* pass) {
+bool addCredential(const char* name, const char* user, const char* pass, bool favorite = false) {
   if (credCount >= MAX_CREDS) return false;
   strncpy(creds[credCount].name, name, 32); creds[credCount].name[32] = 0;
   strncpy(creds[credCount].user, user, 64); creds[credCount].user[64] = 0;
   strncpy(creds[credCount].pass, pass, 64); creds[credCount].pass[64] = 0;
+  creds[credCount].favorite = favorite;
   saveSingleCred(credCount);
   credCount++;
   prefs.putInt("cnt", credCount);
@@ -343,6 +350,25 @@ bool updateCredential(int idx, const char* name, const char* user, const char* p
   return true;
 }
 
+// Atualiza apenas a marca, sem recifrar a credencial ou mudar seu ID.
+bool setCredentialFavorite(int idx, bool favorite) {
+  if (idx < 0 || idx >= credCount) return false;
+  char key[4];
+  sprintf(key, "f%d", idx);
+  if (prefs.putBool(key, favorite) == 0) return false;
+  creds[idx].favorite = favorite;
+  return true;
+}
+
+// Ordenacao apenas para exibicao: IDs de armazenamento continuam estaveis.
+int credentialDisplayIndex(int position) {
+  if (position < 0 || position >= credCount) return -1;
+  for (int group = 1; group >= 0; group--)
+    for (int i = 0; i < credCount; i++)
+      if (creds[i].favorite == (group != 0) && position-- == 0) return i;
+  return -1;
+}
+
 bool deleteCredential(int idx) {
   if (idx < 0 || idx >= credCount) return false;
   for (int i = idx; i < credCount - 1; i++) {
@@ -353,6 +379,9 @@ bool deleteCredential(int idx) {
   prefs.putInt("cnt", credCount);
   char key[4]; sprintf(key, "c%d", credCount);
   prefs.remove(key);
+  sprintf(key, "f%d", credCount);
+  prefs.remove(key);
+  mbedtls_platform_zeroize(&creds[credCount], sizeof(Credential));
   return true;
 }
 
@@ -361,7 +390,8 @@ bool deleteCredential(int idx) {
 //   bmaster = PBKDF2-HMAC-SHA256(senha do backup, bsalt, iter)
 //   chave = SHA-256(bmaster||"bkey"), verificador = SHA-256(bmaster||"bver"),
 //   chave do MAC = SHA-256(bmaster||"bmac"); MAC = HMAC(salt + "," + c0 + "," + c1 ...)
-// Cada credencial: "name|user|pass" -> AES-256-CBC (IV aleatorio) -> hex
+// v2 inclui "2," antes do salt no MAC para autenticar a versao.
+// v1: "name|user|pass"; v2: "favorite|name|user|pass" -> AES-256-CBC (IV aleatorio) -> hex
 
 #define BACKUP_ITERS_MIN  1000
 #define BACKUP_ITERS_MAX  200000
@@ -418,13 +448,14 @@ String exportBackup(const char* pw) {
 
   static String entries[MAX_CREDS];
   for (int i = 0; i < credCount; i++) {
-    String plain = String(creds[i].name) + "|" + creds[i].user + "|" + creds[i].pass;
+    String plain = String(creds[i].favorite ? "1|" : "0|") + creds[i].name +
+                   "|" + creds[i].user + "|" + creds[i].pass;
     entries[i] = encryptData(plain.c_str(), key);
     mbedtls_platform_zeroize((void*)plain.c_str(), plain.length());
   }
-  backupMac(macKey, saltHex, entries, credCount, mac);
+  backupMac(macKey, String("2,") + saltHex, entries, credCount, mac);
 
-  String json = "{\"app\":\"PassVault\",\"v\":1,\"iter\":" + String(KDF_ITERS) +
+  String json = "{\"app\":\"PassVault\",\"v\":2,\"iter\":" + String(KDF_ITERS) +
                 ",\"salt\":\"" + saltHex + "\",\"ver\":\"" + bytesToHex(ver, 32) +
                 "\",\"mac\":\"" + bytesToHex(mac, 32) + "\",\"creds\":[";
   for (int i = 0; i < credCount; i++) {
@@ -441,21 +472,34 @@ String exportBackup(const char* pw) {
 // Importa credenciais de um backup, ignorando duplicadas (mesmo nome+usuario).
 // Retorno: >=0 adicionadas, -1 senha errada, -2 arquivo invalido/alterado
 int importBackup(const char* pw, int iters, const String& saltHex, const String& verHex,
-                 const String& macHex, const String* entries, int n, int* skipped) {
+                 const String& macHex, const String* entries, int n, int* skipped, int version = 1) {
   uint8_t bsalt[16], fver[32], fmac[32], key[32], ver[32], macKey[32], mac[32];
   *skipped = 0;
-  if (iters < BACKUP_ITERS_MIN || iters > BACKUP_ITERS_MAX || n < 0 ||
+  if ((version != 1 && version != 2) || iters < BACKUP_ITERS_MIN || iters > BACKUP_ITERS_MAX || n < 0 ||
       !hexToBytes(saltHex, bsalt, 16) || !hexToBytes(verHex, fver, 32) ||
       !hexToBytes(macHex, fmac, 32)) return -2;
 
   deriveBackupKeys(pw, bsalt, iters, key, ver, macKey);
   int result = 0;
   if (!ctEqual(ver, fver, 32)) { result = -1; goto done; }
-  backupMac(macKey, saltHex, entries, n, mac);
+  backupMac(macKey, version == 2 ? String("2,") + saltHex : saltHex, entries, n, mac);
   if (!ctEqual(mac, fmac, 32)) { result = -2; goto done; }
 
   for (int i = 0; i < n; i++) {
     String plain = decryptData(entries[i], key);
+    bool favorite = false;
+    if (version == 2) {
+      if (!plain.startsWith("0|") && !plain.startsWith("1|")) {
+        mbedtls_platform_zeroize((void*)plain.c_str(), plain.length());
+        (*skipped)++;
+        continue;
+      }
+      favorite = plain[0] == '1';
+      String payload = plain.substring(2);
+      mbedtls_platform_zeroize((void*)plain.c_str(), plain.length());
+      plain = payload;
+      mbedtls_platform_zeroize((void*)payload.c_str(), payload.length());
+    }
     int p1 = plain.indexOf('|');
     int p2 = plain.indexOf('|', p1 + 1);
     if (p1 > 0 && p2 > p1) {
@@ -464,7 +508,7 @@ int importBackup(const char* pw, int iters, const String& saltHex, const String&
       bool dup = false;
       for (int j = 0; j < credCount && !dup; j++)
         dup = name == creds[j].name && user == creds[j].user;
-      if (dup || !addCredential(name.c_str(), user.c_str(), pass.c_str())) (*skipped)++;
+      if (dup || !addCredential(name.c_str(), user.c_str(), pass.c_str(), favorite)) (*skipped)++;
       else result++;
       mbedtls_platform_zeroize((void*)pass.c_str(), pass.length());
     } else {

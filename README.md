@@ -16,6 +16,7 @@ It is a PlatformIO project with one firmware and a build environment for each su
 - **Wi-Fi management:** an on-demand Wi-Fi access point with a single-page web app to list, add, edit and delete credentials. Each time it is turned on it gets a **new random password**, accepts only one client, and shuts down after 5 minutes without use.
 - **Search by name:** filter the menu list with an on-screen A–Z/0–9 keyboard. Matching ignores case and finds the text anywhere in the name.
 - **Password generator:** the web UI creates random passwords with a chosen length and character types.
+- **Favorites:** mark frequently used credentials with **Favoritar** on the device or web detail screen. Favorites appear first, including in search results, and survive locking and rebooting. Use **Desmarcar** to remove the mark.
 - **Encrypted backup:** export all credentials to a JSON file protected by a backup password, and import them again on the same or another device.
 - **Up to 30 credentials:** name ≤ 32 chars, user ≤ 64, password ≤ 64.
 - **Several boards:** portrait and landscape layouts, capacitive, resistive or button-only input, and a USB or BLE keyboard.
@@ -243,12 +244,13 @@ Imported credentials are **added** to the vault. A credential with the same name
 The backup password is separate from the PIN, so a backup can be restored after changing the PIN, after a vault wipe, or on another board. The encryption runs on the device, because browsers block Web Crypto on plain-HTTP pages. The file format is:
 
 ```json
-{"app":"PassVault","v":1,"iter":20000,"salt":"<hex>","ver":"<hex>","mac":"<hex>","creds":["<hex>", "..."]}
+{"app":"PassVault","v":2,"iter":20000,"salt":"<hex>","ver":"<hex>","mac":"<hex>","creds":["<hex>", "..."]}
 ```
 
 - The backup key is derived with **PBKDF2-HMAC-SHA256** (`iter` rounds) from the backup password and a new random 16-byte `salt` on each export.
-- Each `creds` entry is `name|user|pass`, encrypted with **AES-256-CBC** and a random IV (IV + ciphertext, hex).
-- `ver` checks the password, and `mac` (**HMAC-SHA256** over the salt and all entries) detects a damaged or modified file.
+- Each v2 `creds` entry is `favorite|name|user|pass` (`favorite` is `0` or `1`), encrypted with **AES-256-CBC** and a random IV (IV + ciphertext, hex).
+- Favorites are preserved in backups. Legacy v1 backups (`name|user|pass`) remain importable; their credentials start without favorites. Use the updated firmware to import v2 backups.
+- `ver` checks the password, and `mac` (**HMAC-SHA256** over `2,`, the salt and all entries in v2; the salt and entries in v1) detects a damaged or modified file.
 
 > Anyone who has the file can try to guess the backup password offline. Use a long, unique password and keep the file somewhere safe.
 
@@ -418,8 +420,9 @@ const char* kbdLabel();
 | GET | `/api/get` | Get one credential |
 | POST | `/api/save` | Add or update a credential |
 | POST | `/api/del` | Delete a credential |
+| POST | `/api/favorite` | Set favorite status (`id`, `favorite` = `0` or `1`) |
 | POST | `/api/export` | Download an encrypted backup (`pw` = backup password) |
-| POST | `/api/import` | Import a backup (`pw`, `iter`, `salt`, `ver`, `mac`, `n`, `c0`…`cN`) |
+| POST | `/api/import` | Import a backup (`pw`, `v` = backup version (defaults to 1), `iter`, `salt`, `ver`, `mac`, `n`, `c0`…`cN`) |
 
 ---
 
