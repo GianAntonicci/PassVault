@@ -18,7 +18,7 @@ TFT_eSPI tft = TFT_eSPI();
 #include "vault_web.h"
 
 // ---- State machine ----
-enum State { ST_PIN_SETUP, ST_PIN_CONFIRM, ST_PIN_ENTRY, ST_MENU, ST_DETAIL, ST_WEB, ST_SEARCH };
+enum State { ST_PIN_SETUP, ST_PIN_CONFIRM, ST_PIN_ENTRY, ST_MENU, ST_DETAIL, ST_WEB, ST_SEARCH, ST_SETTINGS };
 State state = ST_PIN_ENTRY;
 
 char pinBuf[PIN_LEN_MAX + 1]     = "";
@@ -76,6 +76,7 @@ void drawMenu();
 void drawDetail();
 void drawWebScreen();
 void drawSearch();
+void drawSettings();
 void drawPinScreen(const char* title);
 void lockDevice();
 
@@ -442,7 +443,7 @@ void drawMenu() {
 #endif
 
   int btnY = SCR_H - MENU_BTN_H - 6;
-  btn(6, btnY, MENU_BTN_W, MENU_BTN_H, "WiFi", C_ACCENT);
+  btn(6, btnY, MENU_BTN_W, MENU_BTN_H, "Config.", C_ACCENT);
   btn(SCR_W - MENU_BTN_W - 6, btnY, MENU_BTN_W, MENU_BTN_H, "Bloquear", C_WARN);
   focusEnd();
 }
@@ -476,9 +477,8 @@ void handleMenuTouch(int tx, int ty, int gesture) {
   }
 
   if (inBox(tx, ty, 6, btnY, MENU_BTN_W, MENU_BTN_H)) {
-    startWeb();
-    state = ST_WEB;
-    drawWebScreen();
+    state = ST_SETTINGS;
+    drawSettings();
     return;
   }
 
@@ -697,6 +697,58 @@ void handleDetailTouch(int tx, int ty) {
   }
 }
 
+// ---- Configuracoes ----
+#define SETTINGS_X       10
+#define SETTINGS_W       (SCR_W - 20)
+#define SETTINGS_H       38
+#define SETTINGS_LOCK_Y  60
+#define SETTINGS_WIFI_Y  128
+#define SETTINGS_BACK_Y  (SCR_H - SETTINGS_H - 8)
+
+void drawSettings() {
+  focusBegin(ST_SETTINGS);
+  tft.fillScreen(C_BG);
+  tft.setTextColor(C_ACCENT);
+  tft.setTextDatum(TC_DATUM);
+  tft.drawString("Configuracoes", SCR_W / 2, 12, 2);
+
+  char label[24];
+  if (autoLockMs < 60000UL)
+    snprintf(label, sizeof(label), "Auto-lock: %lu s", autoLockMs / 1000UL);
+  else
+    snprintf(label, sizeof(label), "Auto-lock: %lu min", autoLockMs / 60000UL);
+  btn(SETTINGS_X, SETTINGS_LOCK_Y, SETTINGS_W, SETTINGS_H, label, C_ACCENT);
+  tft.setTextColor(C_DIM);
+  tft.setTextDatum(TC_DATUM);
+  tft.drawString("Pressione para mudar", SCR_W / 2, SETTINGS_LOCK_Y + SETTINGS_H + 6, 2);
+  btn(SETTINGS_X, SETTINGS_WIFI_Y, SETTINGS_W, SETTINGS_H, "Ativar WiFi", C_BTN);
+  btn(SETTINGS_X, SETTINGS_BACK_Y, SETTINGS_W, SETTINGS_H, "Voltar", C_BTN);
+  focusEnd();
+}
+
+void handleSettingsTouch(int tx, int ty) {
+  if (inBox(tx, ty, SETTINGS_X, SETTINGS_LOCK_Y, SETTINGS_W, SETTINGS_H)) {
+    size_t next = 0;
+    for (size_t i = 0; i < AUTOLOCK_OPTION_COUNT; i++)
+      if (autoLockMs == AUTOLOCK_OPTIONS_MS[i]) next = (i + 1) % AUTOLOCK_OPTION_COUNT;
+    bool saved = setAutoLock(AUTOLOCK_OPTIONS_MS[next]);
+    drawSettings();
+    if (!saved) {
+      tft.fillRect(0, SETTINGS_LOCK_Y + SETTINGS_H + 6, SCR_W, 16, C_BG);
+      tft.setTextColor(C_WARN);
+      tft.setTextDatum(TC_DATUM);
+      tft.drawString("Falha ao salvar", SCR_W / 2, SETTINGS_LOCK_Y + SETTINGS_H + 6, 2);
+    }
+  } else if (inBox(tx, ty, SETTINGS_X, SETTINGS_WIFI_Y, SETTINGS_W, SETTINGS_H)) {
+    startWeb();
+    state = ST_WEB;
+    drawWebScreen();
+  } else if (inBox(tx, ty, SETTINGS_X, SETTINGS_BACK_Y, SETTINGS_W, SETTINGS_H)) {
+    state = ST_MENU;
+    drawMenu();
+  }
+}
+
 // ---- Web Screen ----
 #define WEB_BTN_W  140
 #define WEB_BTN_H  42
@@ -722,8 +774,8 @@ void drawWebScreen() {
 
 void closeWeb() {
   stopWeb();
-  state = ST_MENU;
-  drawMenu();
+  state = ST_SETTINGS;
+  drawSettings();
 }
 
 void handleWebTouch(int tx, int ty) {
@@ -749,6 +801,7 @@ void handleBack() {
       closeSearch();
       break;
     case ST_DETAIL:
+    case ST_SETTINGS:
       state = ST_MENU;
       drawMenu();
       break;
@@ -834,7 +887,7 @@ void loop() {
     return;
   }
 
-  if ((state == ST_MENU || state == ST_DETAIL || state == ST_SEARCH) && millis() - lastAction > AUTOLOCK_MS) {
+  if ((state == ST_MENU || state == ST_DETAIL || state == ST_SEARCH || state == ST_SETTINGS) && millis() - lastAction >= autoLockMs) {
     lockDevice();
     return;
   }
@@ -872,6 +925,9 @@ void loop() {
       break;
     case ST_SEARCH:
       handleSearchTouch(tx, ty);
+      break;
+    case ST_SETTINGS:
+      handleSettingsTouch(tx, ty);
       break;
   }
 }

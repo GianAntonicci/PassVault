@@ -77,7 +77,9 @@
 
 // Settings
 #define MAX_CREDS      30
-#define AUTOLOCK_MS     60000
+#define AUTOLOCK_MS     60000UL  // padrao quando nao ha preferencia salva
+constexpr unsigned long AUTOLOCK_OPTIONS_MS[] = {30000UL, 60000UL, 120000UL, 300000UL, 600000UL};
+constexpr size_t AUTOLOCK_OPTION_COUNT = sizeof(AUTOLOCK_OPTIONS_MS) / sizeof(AUTOLOCK_OPTIONS_MS[0]);
 
 // ---- Seguranca ----
 // Tamanho do PIN de vaults NOVOS (vaults antigos continuam com 4)

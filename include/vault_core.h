@@ -23,6 +23,19 @@ Credential  creds[MAX_CREDS];
 int         credCount = 0;
 uint8_t     aesKey[32];
 uint8_t     salt[16];
+unsigned long autoLockMs = AUTOLOCK_MS;
+
+bool validAutoLock(unsigned long ms) {
+  for (size_t i = 0; i < AUTOLOCK_OPTION_COUNT; i++)
+    if (ms == AUTOLOCK_OPTIONS_MS[i]) return true;
+  return false;
+}
+
+bool setAutoLock(unsigned long ms) {
+  if (!validAutoLock(ms) || prefs.putULong("autolock", ms) != sizeof(uint32_t)) return false;
+  autoLockMs = ms;
+  return true;
+}
 
 // ---- Crypto helpers ----
 
@@ -199,6 +212,8 @@ void finishMigration() {
 void storageBegin() {
   prefs.begin("pv", false);
   finishMigration();
+  unsigned long saved = prefs.getULong("autolock", AUTOLOCK_MS);
+  autoLockMs = validAutoLock(saved) ? saved : AUTOLOCK_MS;
 }
 
 bool storageHasPin() {

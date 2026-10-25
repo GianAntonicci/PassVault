@@ -10,7 +10,7 @@ It is a PlatformIO project with one firmware and a build environment for each su
 
 - **PIN lock:** a 6-digit PIN entered on an on-screen numpad. The PIN is created on first boot.
 - **Attempt limit:** the wrong-PIN counter is stored in flash, so rebooting does not reset it. After 5 wrong PINs the device locks for 30 s, and the wait doubles with each further error. On the 10th wrong PIN, **the whole vault is erased**.
-- **Auto-lock:** after 60 s of inactivity in the menu or detail screen, the device locks and the decrypted credentials are wiped from RAM.
+- **Auto-lock:** after a configurable inactivity timeout (60 s by default), the device locks and the decrypted credentials are wiped from RAM. Choose 30 s, 60 s, 2 min, 5 min or 10 min in **Config. → Auto-lock**; the choice survives a restart.
 - **Encrypted storage:** each credential is AES-256-CBC encrypted with a random IV and stored in NVS flash.
 - **Auto-typing:** each credential offers *All* (user + TAB + password), *Login* (user only) or *Password* (password only).
 - **Wi-Fi management:** an on-demand Wi-Fi access point with a single-page web app to list, add, edit and delete credentials. Each time it is turned on it gets a **new random password**, accepts only one client, and shuts down after 5 minutes without use.
@@ -103,7 +103,7 @@ pio device monitor                           # optional, 115200 baud
 ### 6. First use
 
 1. **Create a PIN:** on first boot, enter a 6-digit PIN twice. Unlocking takes a moment ("Verificando...") because of the key derivation.
-2. **Turn on Wi-Fi:** tap **WiFi**. The screen shows the network `PassVault`, a **random password** and the URL (normally `http://192.168.4.1`).
+2. **Turn on Wi-Fi:** tap **Config. → Ativar WiFi**. The screen shows the network `PassVault`, a **random password** and the URL (normally `http://192.168.4.1`).
 3. **Add credentials:** connect your phone or laptop to that network, open the URL and add your credentials.
 4. **Turn off Wi-Fi:** tap **Desligar WiFi**. The AP also turns itself off after 5 minutes without use.
 5. **Type a credential:** put the cursor in a login field on the computer, select a credential on the device and tap **Tudo** (user + TAB + password), **Login** or **Senha**.
@@ -195,7 +195,7 @@ The device does **not** press Enter, so you submit the form yourself. This avoid
 
 ### Managing credentials (web UI)
 
-1. In the menu, tap **WiFi**.
+1. In the menu, tap **Config. → Ativar WiFi**.
 2. On your phone or laptop, connect to the network **PassVault** using the password shown on the device. The password changes every time Wi-Fi is turned on.
 3. Open the URL shown on screen, normally `http://192.168.4.1`.
 
@@ -263,7 +263,7 @@ When you are done, tap **Desligar WiFi** on the device. If you forget, Wi-Fi tur
 | How | When |
 |---|---|
 | **Bloquear** button in the menu | Immediately |
-| Auto-lock | After **60 s** without input in the menu or detail screen |
+| Auto-lock | After **60 s** by default without input in the menu, detail, search or settings screen; adjustable in **Config. → Auto-lock** |
 | Wi-Fi idle | After **5 min** without input or web requests on the Wi-Fi screen |
 | Power off / reset | The decrypted credentials only exist in RAM, so they are gone |
 
@@ -292,7 +292,8 @@ When the device locks, the encryption key and all decrypted credentials are wipe
 | Buscar... / Buscar | Search |
 | Limpar / OK | Clear / OK |
 | Nada encontrado | No matches |
-| WiFi / Bloquear | Wi-Fi / Lock |
+| Config. / Bloquear | Settings / Lock |
+| Configuracoes / Ativar WiFi | Settings / Turn on Wi-Fi |
 | Usuario / Senha | Username / Password |
 | Tudo / Login / Senha / Voltar | All / Username / Password / Back |
 | WiFi Ativo / Desligar WiFi | Wi-Fi on / Turn off Wi-Fi |
@@ -315,17 +316,19 @@ When the device locks, the encryption key and all decrypted credentials are wipe
           └──────────────┘◄──── Lock / auto-lock ───────│  Menu  │
                  │ 5 wrong                              └────────┘
                  ▼                                       │      │
-          30 s lockout                         select item│      │WiFi
+          30 s lockout                         select item│      │Config.
                                                          ▼      ▼
                                                    ┌────────┐ ┌──────────┐
-                                                   │ Detail │ │ Wi-Fi AP │
+                                                   │ Detail │ │ Settings │
                                                    └────────┘ └──────────┘
 
 Menu ──► Search (tap "Buscar...") ──► OK ──► Menu (filtered)
+Settings ──► Auto-lock (cycle timeout) / Ativar WiFi ──► Wi-Fi AP
 ```
 
 - **PIN screens:** a numpad with digits, `C` (clear) and `<` (backspace).
-- **Menu:** a scrollable credential list (swipe on the touch board, or button navigation) plus *WiFi* and *Bloquear* (Lock) buttons. The top-right corner shows `USB` or `BLE`. For BLE it is green only while a host is paired.
+- **Menu:** a scrollable credential list (swipe on the touch board, or button navigation) plus *Config.* (Settings) and *Bloquear* (Lock) buttons. The top-right corner shows `USB` or `BLE`. For BLE it is green only while a host is paired.
+- **Settings:** press *Auto-lock* to cycle through 30 s, 60 s, 2 min, 5 min and 10 min. Each change takes effect immediately and is saved in NVS. *Ativar WiFi* opens the Wi-Fi screen; *Voltar* returns to the menu. Physical-button boards use the same focus navigation as other screens. The Wi-Fi screen keeps its separate 5-minute idle timeout.
 - **Detail:** shows the name and username with the password masked, plus the *Tudo / Login / Senha / Voltar* buttons.
 - **Wi-Fi:** shows the SSID, password and URL of the access point.
 
@@ -510,7 +513,7 @@ Settings shared by every board:
 | `WIPE_AFTER` | 10 | Wrong PINs that erase the vault (0 = never) |
 | `AP_SSID` / `AP_PASS_LEN` | `PassVault` / 10 | AP name and length of the random password |
 | `WEB_IDLE_MS` | 300000 | Wi-Fi idle time before the AP shuts down and the device locks |
-| `AUTOLOCK_MS` | 60000 | Inactivity time before auto-lock |
+| `AUTOLOCK_MS` | 60000 | Default inactivity timeout; the device settings override it with a value from `AUTOLOCK_OPTIONS_MS` |
 | `BLE_KBD_NAME` | `PassVault` | Bluetooth device name |
 | `C_*` | — | UI colours (RGB565) |
 
