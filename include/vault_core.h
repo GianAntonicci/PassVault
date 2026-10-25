@@ -37,6 +37,14 @@ bool setAutoLock(unsigned long ms) {
   return true;
 }
 
+bool setTheme(uint8_t theme) {
+  if (theme >= THEME_COUNT) return false;
+  if (theme == activeTheme) return true;
+  if (prefs.putUChar("theme", theme) != sizeof(uint8_t)) return false;
+  activeTheme = theme;
+  return true;
+}
+
 // ---- Crypto helpers ----
 
 // v1 (legado): chave = SHA-256(salt || PIN). Usado so para migrar.
@@ -214,6 +222,8 @@ void storageBegin() {
   finishMigration();
   unsigned long saved = prefs.getULong("autolock", AUTOLOCK_MS);
   autoLockMs = validAutoLock(saved) ? saved : AUTOLOCK_MS;
+  uint8_t theme = prefs.getUChar("theme", 0);
+  activeTheme = theme < THEME_COUNT ? theme : 0;
 }
 
 bool storageHasPin() {

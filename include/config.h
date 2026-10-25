@@ -105,14 +105,28 @@ constexpr size_t AUTOLOCK_OPTION_COUNT = sizeof(AUTOLOCK_OPTIONS_MS) / sizeof(AU
 // Nome anunciado pelo teclado BLE
 #define BLE_KBD_NAME  "PassVault"
 
-// Colors RGB565
+// Paletas RGB565. A ordem tambem identifica o tema salvo na NVS.
+struct ColorTheme {
+  const char* name;
+  uint16_t text, accent, button, dim, card;
+};
+const ColorTheme COLOR_THEMES[] = {
+  {"Cyber Green", 0x07E0, 0x07FF, 0xBDF7, 0x8410, 0x18E3},
+  {"Azul",        0x9DFF, 0x5DFF, 0xC6FF, 0x8494, 0x0847},
+  {"Roxo",        0xD5FF, 0xC39F, 0xE67F, 0x9495, 0x2086},
+  {"Ambar",       0xFEA0, 0xFD20, 0xFF18, 0x9C70, 0x28C0}
+};
+constexpr size_t THEME_COUNT = sizeof(COLOR_THEMES) / sizeof(COLOR_THEMES[0]);
+uint8_t activeTheme = 0;
+
+// Cores semanticas: avisos e confirmacoes mantem vermelho/verde.
 #define C_BG      0x0000
-#define C_TEXT    0x07E0
-#define C_ACCENT  0x07FF
-#define C_BTN     0xBDF7
+#define C_TEXT    (COLOR_THEMES[activeTheme].text)
+#define C_ACCENT  (COLOR_THEMES[activeTheme].accent)
+#define C_BTN     (COLOR_THEMES[activeTheme].button)
 #define C_WARN    0xF800
 #define C_OK      0x07E0
-#define C_DIM     0x4208
-#define C_CARD    0x18E3
+#define C_DIM     (COLOR_THEMES[activeTheme].dim)
+#define C_CARD    (COLOR_THEMES[activeTheme].card)
 
 #endif

@@ -18,7 +18,7 @@ TFT_eSPI tft = TFT_eSPI();
 #include "vault_web.h"
 
 // ---- State machine ----
-enum State { ST_PIN_SETUP, ST_PIN_CONFIRM, ST_PIN_ENTRY, ST_MENU, ST_DETAIL, ST_WEB, ST_SEARCH, ST_SETTINGS };
+enum State { ST_PIN_SETUP, ST_PIN_CONFIRM, ST_PIN_ENTRY, ST_MENU, ST_DETAIL, ST_WEB, ST_SEARCH, ST_SETTINGS, ST_THEMES };
 State state = ST_PIN_ENTRY;
 
 char pinBuf[PIN_LEN_MAX + 1]     = "";
@@ -661,7 +661,6 @@ void detailBtnPos(int i, int &x, int &y) {
 }
 
 const char* detLabels[DET_BTN_COUNT] = {"Tudo", "Login", "Senha", "Voltar", "Revelar", "Favoritar"};
-const uint16_t detColors[DET_BTN_COUNT] = {C_OK, C_ACCENT, C_ACCENT, C_DIM, C_ACCENT, C_WARN};
 
 void drawDetailPassword() {
   // Fonte de 6x8: ate 64 caracteres cabem em 3 linhas no portrait.
@@ -677,6 +676,7 @@ void drawDetailPassword() {
 }
 
 void drawDetail() {
+  const uint16_t detColors[DET_BTN_COUNT] = {C_OK, C_ACCENT, C_ACCENT, C_DIM, C_ACCENT, C_WARN};
   typingFeedbackVisible = false;
   detailPasswordVisible = false;
   focusBegin(ST_DETAIL);
@@ -731,8 +731,9 @@ void handleDetailTouch(int tx, int ty) {
 #define SETTINGS_X       10
 #define SETTINGS_W       (SCR_W - 20)
 #define SETTINGS_H       38
-#define SETTINGS_LOCK_Y  60
-#define SETTINGS_WIFI_Y  128
+#define SETTINGS_LOCK_Y  42
+#define SETTINGS_WIFI_Y  110
+#define SETTINGS_THEME_Y 152
 #define SETTINGS_BACK_Y  (SCR_H - SETTINGS_H - 8)
 
 void drawSettings() {
@@ -752,8 +753,46 @@ void drawSettings() {
   tft.setTextDatum(TC_DATUM);
   tft.drawString("Pressione para mudar", SCR_W / 2, SETTINGS_LOCK_Y + SETTINGS_H + 6, 2);
   btn(SETTINGS_X, SETTINGS_WIFI_Y, SETTINGS_W, SETTINGS_H, "Ativar WiFi", C_BTN);
+  btn(SETTINGS_X, SETTINGS_THEME_Y, SETTINGS_W, SETTINGS_H, "Temas", C_ACCENT);
   btn(SETTINGS_X, SETTINGS_BACK_Y, SETTINGS_W, SETTINGS_H, "Voltar", C_BTN);
   focusEnd();
+}
+
+// ---- Aba de temas: selecao com aplicacao imediata ----
+#define THEME_Y      38
+#define THEME_H      28
+#define THEME_STEP   34
+
+void drawThemes(const char* status = "", bool failed = false) {
+  focusBegin(ST_THEMES);
+  tft.fillScreen(C_BG);
+  tft.setTextColor(C_ACCENT);
+  tft.setTextDatum(TC_DATUM);
+  tft.drawString("Temas", SCR_W / 2, 12, 2);
+  for (size_t i = 0; i < THEME_COUNT; i++) {
+    char label[24];
+    snprintf(label, sizeof(label), "%s%s", i == activeTheme ? "* " : "", COLOR_THEMES[i].name);
+    btn(SETTINGS_X, THEME_Y + i * THEME_STEP, SETTINGS_W, THEME_H,
+        label, COLOR_THEMES[i].accent);
+  }
+  tft.setTextColor(failed ? C_WARN : C_TEXT);
+  tft.setTextDatum(TC_DATUM);
+  tft.drawString(status, SCR_W / 2, THEME_Y + THEME_COUNT * THEME_STEP, 2);
+  btn(SETTINGS_X, SETTINGS_BACK_Y, SETTINGS_W, SETTINGS_H, "Voltar", C_BTN);
+  focusEnd();
+}
+
+void handleThemesTouch(int tx, int ty) {
+  for (size_t i = 0; i < THEME_COUNT; i++) {
+    if (!inBox(tx, ty, SETTINGS_X, THEME_Y + i * THEME_STEP, SETTINGS_W, THEME_H)) continue;
+    bool saved = setTheme(i);
+    drawThemes(saved ? "Tema salvo" : "Falha ao salvar", !saved);
+    return;
+  }
+  if (inBox(tx, ty, SETTINGS_X, SETTINGS_BACK_Y, SETTINGS_W, SETTINGS_H)) {
+    state = ST_SETTINGS;
+    drawSettings();
+  }
 }
 
 void handleSettingsTouch(int tx, int ty) {
@@ -773,6 +812,9 @@ void handleSettingsTouch(int tx, int ty) {
     startWeb();
     state = ST_WEB;
     drawWebScreen();
+  } else if (inBox(tx, ty, SETTINGS_X, SETTINGS_THEME_Y, SETTINGS_W, SETTINGS_H)) {
+    state = ST_THEMES;
+    drawThemes();
   } else if (inBox(tx, ty, SETTINGS_X, SETTINGS_BACK_Y, SETTINGS_W, SETTINGS_H)) {
     state = ST_MENU;
     drawMenu();
@@ -837,6 +879,10 @@ void handleBack() {
       break;
     case ST_WEB:
       closeWeb();
+      break;
+    case ST_THEMES:
+      state = ST_SETTINGS;
+      drawSettings();
       break;
   }
 }
@@ -923,7 +969,7 @@ void loop() {
     return;
   }
 
-  if ((state == ST_MENU || state == ST_DETAIL || state == ST_SEARCH || state == ST_SETTINGS) && millis() - lastAction >= autoLockMs) {
+  if ((state == ST_MENU || state == ST_DETAIL || state == ST_SEARCH || state == ST_SETTINGS || state == ST_THEMES) && millis() - lastAction >= autoLockMs) {
     lockDevice();
     return;
   }
@@ -965,6 +1011,9 @@ void loop() {
       break;
     case ST_SETTINGS:
       handleSettingsTouch(tx, ty);
+      break;
+    case ST_THEMES:
+      handleThemesTouch(tx, ty);
       break;
   }
 }
