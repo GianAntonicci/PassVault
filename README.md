@@ -330,6 +330,7 @@ Settings ──► Auto-lock (cycle timeout) / Ativar WiFi ──► Wi-Fi AP
 - **Menu:** a scrollable credential list (swipe on the touch board, or button navigation) plus *Config.* (Settings) and *Bloquear* (Lock) buttons. The top-right corner shows `USB` or `BLE`. For BLE it is green only while a host is paired.
 - **Settings:** press *Auto-lock* to cycle through 30 s, 60 s, 2 min, 5 min and 10 min. Each change takes effect immediately and is saved in NVS. *Ativar WiFi* opens the Wi-Fi screen; *Voltar* returns to the menu. Physical-button boards use the same focus navigation as other screens. The Wi-Fi screen keeps its separate 5-minute idle timeout.
 - **Detail:** shows the name and username with the password masked, plus the *Tudo / Login / Senha / Voltar* buttons.
+- **Typing feedback:** *Tudo*, *Login* and *Senha* show **Digitando...** during USB/BLE transmission, followed by **Envio finalizado** for 0.9 s before returning to the detail screen. Credential contents stay hidden during this feedback.
 - **Wi-Fi:** shows the SSID, password and URL of the access point.
 
 ### Security model

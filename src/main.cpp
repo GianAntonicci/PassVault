@@ -30,6 +30,9 @@ int  menuTop  = 0;
 bool detailPasswordVisible = false;
 unsigned long detailPasswordShownAt = 0;
 const unsigned long DETAIL_REVEAL_MS = 3000;
+bool typingFeedbackVisible = false;
+unsigned long typingFeedbackShownAt = 0;
+const unsigned long TYPING_FEEDBACK_MS = 900;
 
 // Busca por nome: filtro aplicado a lista do menu
 char searchBuf[33] = "";
@@ -588,7 +591,28 @@ void handleSearchTouch(int tx, int ty) {
 }
 
 // ---- Detail ----
+void drawTypingFeedback(const char* message, uint16_t color) {
+  // Oculta os dados e retira o foco dos botoes durante o envio.
+  detailPasswordVisible = false;
+  focusBegin(-1);
+  tft.fillScreen(C_BG);
+  tft.drawRoundRect(8, SCR_H / 2 - 44, SCR_W - 16, 88, 6, color);
+  tft.setTextColor(color, C_BG);
+  tft.setTextDatum(MC_DATUM);
+  tft.drawString(message, SCR_W / 2, SCR_H / 2 - 10, 2);
+  tft.setTextColor(C_DIM, C_BG);
+  tft.drawString(kbdLabel(), SCR_W / 2, SCR_H / 2 + 16, 2);
+}
+
 void typeCredential(int mode) {
+  if (!kbdConnected()) {
+    drawTypingFeedback("Conecte o teclado", C_WARN);
+    typingFeedbackVisible = true;
+    typingFeedbackShownAt = millis();
+    return;
+  }
+
+  drawTypingFeedback("Digitando...", C_ACCENT);
   if (mode == 0 || mode == 1) {
     kbdPrint(creds[selCred].user);
     if (mode == 0) {
@@ -598,6 +622,11 @@ void typeCredential(int mode) {
   if (mode == 0 || mode == 2) {
     kbdPrint(creds[selCred].pass);
   }
+  drawTypingFeedback(kbdConnected() ? "Envio finalizado" : "Teclado desconectado",
+                     kbdConnected() ? C_OK : C_WARN);
+  typingFeedbackVisible = true;
+  typingFeedbackShownAt = millis();
+  lastAction = millis();
 }
 
 // Botoes do detalhe: 0=Tudo 1=Login 2=Senha 3=Voltar 4=Revelar 5=Favoritar
@@ -648,6 +677,7 @@ void drawDetailPassword() {
 }
 
 void drawDetail() {
+  typingFeedbackVisible = false;
   detailPasswordVisible = false;
   focusBegin(ST_DETAIL);
   tft.fillScreen(C_BG);
@@ -813,6 +843,7 @@ void handleBack() {
 
 // ---- Lock ----
 void lockDevice() {
+  typingFeedbackVisible = false;
   detailPasswordVisible = false;
   clearMemory();
   clearPinBuffers();
@@ -857,6 +888,11 @@ void setup() {
 
 // ===================== LOOP =====================
 void loop() {
+  // Mantem a confirmacao visivel sem bloquear o loop ou o auto-lock.
+  if (state == ST_DETAIL && typingFeedbackVisible &&
+      millis() - typingFeedbackShownAt >= TYPING_FEEDBACK_MS) {
+    drawDetail();
+  }
   // Sem delay: o dispositivo continua respondendo durante os 3 segundos.
   // Subtracao sem sinal mantem o prazo correto mesmo quando millis() transborda.
   if (state == ST_DETAIL && detailPasswordVisible &&
@@ -897,6 +933,7 @@ void loop() {
 
   int tx, ty, gesture;
   if (!inputRead(tx, ty, gesture)) return;
+  if (state == ST_DETAIL && typingFeedbackVisible) return;
 
   static unsigned long lastTouch = 0;
   if (millis() - lastTouch < TOUCH_DEBOUNCE) return;
