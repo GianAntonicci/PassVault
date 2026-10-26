@@ -24,6 +24,7 @@ int         credCount = 0;
 uint8_t     aesKey[32];
 uint8_t     salt[16];
 unsigned long autoLockMs = AUTOLOCK_MS;
+bool storageReady = false;
 
 bool validAutoLock(unsigned long ms) {
   for (size_t i = 0; i < AUTOLOCK_OPTION_COUNT; i++)
@@ -170,16 +171,24 @@ void sha256Tagged(const uint8_t* in, size_t len, const char* tag, uint8_t* out) 
   mbedtls_sha256_free(&ctx);
 }
 
+// Permite preparar um novo PIN sem substituir a chave da sessao atual.
+bool derivePinKey(const char* pin, const uint8_t* pinSalt, uint8_t* key, uint8_t* verifier) {
+  uint8_t master[32];
+  int result = mbedtls_pkcs5_pbkdf2_hmac_ext(MBEDTLS_MD_SHA256,
+                                (const uint8_t*)pin, strlen(pin),
+                                pinSalt, 16, KDF_ITERS,
+                                sizeof(master), master);
+  if (result == 0) {
+    sha256Tagged(master, 32, "key", key);
+    sha256Tagged(master, 32, "ver", verifier);
+  }
+  mbedtls_platform_zeroize(master, sizeof(master));
+  return result == 0;
+}
+
 // Deriva chave (aesKey) e verificador a partir do PIN e do salt atual
 void deriveKeyV2(const char* pin, uint8_t* verifier) {
-  uint8_t master[32];
-  mbedtls_pkcs5_pbkdf2_hmac_ext(MBEDTLS_MD_SHA256,
-                                (const uint8_t*)pin, strlen(pin),
-                                salt, sizeof(salt), KDF_ITERS,
-                                sizeof(master), master);
-  sha256Tagged(master, 32, "key", aesKey);
-  sha256Tagged(master, 32, "ver", verifier);
-  mbedtls_platform_zeroize(master, sizeof(master));
+  derivePinKey(pin, salt, aesKey, verifier);
 }
 
 // Comparacao em tempo constante
@@ -217,13 +226,97 @@ void finishMigration() {
   prefs.remove("salt");
 }
 
-void storageBegin() {
-  prefs.begin("pv", false);
+// Transacao de troca de PIN: pvnext guarda uma copia completa recifrada.
+// pinchange e o ponto de commit. Depois dele, a copia e reaplicada ate terminar,
+// inclusive se faltar energia durante a substituicao de c_i/salt2/pv2/plen.
+bool finishPinChange() {
+  if (!prefs.getBool("pinchange", false)) return true;
+  Preferences next;
+  if (!next.begin("pvnext", true)) return false;
+  uint8_t newSalt[16], verifier[32];
+  int count = next.getInt("cnt", -1);
+  uint8_t length = next.getUChar("plen", 0);
+  bool ok = count >= 0 && count <= MAX_CREDS && length > 0 && length <= PIN_LEN_MAX &&
+            next.getBytes("salt2", newSalt, sizeof(newSalt)) == sizeof(newSalt) &&
+            next.getBytes("pv2", verifier, sizeof(verifier)) == sizeof(verifier);
+  // Confere todos os registros antes de comecar a substituir os dados ativos.
+  for (int i = 0; ok && i < count; i++) {
+    char key[5]; snprintf(key, sizeof(key), "c%d", i);
+    String enc = next.getString(key, "");
+    ok = enc.length() >= 64 && enc.length() % 32 == 0;
+  }
+  for (int i = 0; ok && i < count; i++) {
+    char key[5]; snprintf(key, sizeof(key), "c%d", i);
+    String enc = next.getString(key, "");
+    ok = prefs.putString(key, enc) == enc.length();
+  }
+  if (ok) ok = prefs.putBytes("salt2", newSalt, sizeof(newSalt)) == sizeof(newSalt);
+  if (ok) ok = prefs.putBytes("pv2", verifier, sizeof(verifier)) == sizeof(verifier);
+  if (ok) ok = prefs.putUChar("plen", length) == sizeof(uint8_t);
+  if (ok) ok = prefs.putUChar("ver", VAULT_FORMAT) == sizeof(uint8_t);
+  if (ok) ok = prefs.remove("pinchange");
+  next.end();
+  mbedtls_platform_zeroize(newSalt, sizeof(newSalt));
+  mbedtls_platform_zeroize(verifier, sizeof(verifier));
+  // A copia temporaria so e descartada depois da remocao do marcador.
+  if (ok && next.begin("pvnext", false)) { next.clear(); next.end(); }
+  return ok;
+}
+
+enum PinChangeResult { PIN_CHANGE_FAILED, PIN_CHANGE_OK, PIN_CHANGE_PENDING };
+
+// Chamar apenas depois de validar o PIN atual. Nao altera favoritas/configuracoes.
+PinChangeResult changePin(const char* pin) {
+  size_t length = strlen(pin);
+  if (length != PIN_LEN || prefs.getBool("pinchange", false)) return PIN_CHANGE_FAILED;
+  for (size_t i = 0; i < length; i++)
+    if (pin[i] < '0' || pin[i] > '9') return PIN_CHANGE_FAILED;
+  if (credCount < 0 || credCount > MAX_CREDS || credCount != prefs.getInt("cnt", 0))
+    return PIN_CHANGE_FAILED;
+
+  Preferences next;
+  if (!next.begin("pvnext", false)) return PIN_CHANGE_FAILED;
+  uint8_t newSalt[16], key[32], verifier[32];
+  esp_fill_random(newSalt, sizeof(newSalt));
+  bool ok = next.clear() && derivePinKey(pin, newSalt, key, verifier);
+  for (int i = 0; ok && i < credCount; i++) {
+    char name[5]; snprintf(name, sizeof(name), "c%d", i);
+    // Recifra o registro armazenado; nao depende de um carregamento parcial em RAM.
+    String enc = prefs.getString(name, "");
+    if (enc.length() < 64 || enc.length() % 32 != 0) { ok = false; break; }
+    String plain = decryptData(enc);
+    int p1 = plain.indexOf('|'), p2 = plain.indexOf('|', p1 + 1);
+    ok = p1 > 0 && p1 <= 32 && p2 > p1 && p2 - p1 - 1 <= 64 &&
+         plain.length() - p2 - 1 <= 64;
+    if (ok) {
+      String encrypted = encryptData(plain.c_str(), key);
+      ok = encrypted.length() >= 64 && encrypted.length() % 32 == 0 &&
+           next.putString(name, encrypted) == encrypted.length();
+    }
+    mbedtls_platform_zeroize((void*)plain.c_str(), plain.length());
+  }
+  if (ok) ok = next.putInt("cnt", credCount) == sizeof(int32_t);
+  if (ok) ok = next.putUChar("plen", length) == sizeof(uint8_t);
+  if (ok) ok = next.putBytes("salt2", newSalt, sizeof(newSalt)) == sizeof(newSalt);
+  if (ok) ok = next.putBytes("pv2", verifier, sizeof(verifier)) == sizeof(verifier);
+  next.end();
+  mbedtls_platform_zeroize(newSalt, sizeof(newSalt));
+  mbedtls_platform_zeroize(key, sizeof(key));
+  mbedtls_platform_zeroize(verifier, sizeof(verifier));
+  if (!ok || prefs.putBool("pinchange", true) != sizeof(bool)) return PIN_CHANGE_FAILED;
+  return finishPinChange() ? PIN_CHANGE_OK : PIN_CHANGE_PENDING;
+}
+
+bool storageBegin() {
+  storageReady = false;
+  if (!prefs.begin("pv", false) || !finishPinChange()) return false;
   finishMigration();
   unsigned long saved = prefs.getULong("autolock", AUTOLOCK_MS);
   autoLockMs = validAutoLock(saved) ? saved : AUTOLOCK_MS;
   uint8_t theme = prefs.getUChar("theme", 0);
   activeTheme = theme < THEME_COUNT ? theme : 0;
+  storageReady = true;
+  return true;
 }
 
 bool storageHasPin() {
@@ -254,6 +347,9 @@ void storageResetFails() {
 // Apaga TODO o vault (PIN, salt e credenciais)
 void storageWipe() {
   prefs.clear();
+  // Inclui qualquer copia temporaria deixada por uma troca interrompida.
+  Preferences next;
+  if (next.begin("pvnext", false)) { next.clear(); next.end(); }
   mbedtls_platform_zeroize(aesKey, sizeof(aesKey));
   mbedtls_platform_zeroize(creds, sizeof(creds));
   credCount = 0;

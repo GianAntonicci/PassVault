@@ -332,6 +332,11 @@ Settings ──► Auto-lock (cycle timeout) / Ativar WiFi ──► Wi-Fi AP
 - **Detail:** shows the name and username with the password masked, plus the *Tudo / Login / Senha / Voltar* buttons.
 - **Typing feedback:** *Tudo*, *Login* and *Senha* show **Digitando...** during USB/BLE transmission, followed by **Envio finalizado** for 0.9 s before returning to the detail screen. Credential contents stay hidden during this feedback.
 - **Themes:** open **Config. → Temas** on the device and select **Cyber Green**, **Azul**, **Roxo** or **Ambar**. The palette changes immediately across the display, including the PIN screen. An asterisk marks the active theme, and the choice survives a restart. Touch and physical-button navigation are supported; auto-lock remains active in this tab.
+- **Change unlock PIN:** open **Config. → Alterar PIN**, enter the current PIN, then enter and confirm a new 6-digit PIN. Legacy 4-digit PINs are accepted as the current PIN. On success the device locks; unlock with the new PIN. Credentials, favorites and settings are preserved. *Cancelar* (or holding Back on button boards) cancels without changing the PIN, and auto-lock remains active throughout the flow. An incorrect current PIN ends the unlocked session and counts toward the existing lockout/wipe limits.
+
+PIN changes first re-encrypt the stored credentials with a fresh salt into the temporary NVS namespace `pvnext`. Only after every staging write succeeds is the `pinchange` marker committed. Startup replays committed changes before accepting PIN input; interrupted staging leaves the old PIN active. If NVS lacks room for the temporary copy, the change fails and the old PIN remains valid. If committed recovery cannot complete, the display asks for a restart and keeps the vault inaccessible until recovery succeeds.
+
+Run `python3 test/test_pin_change.py` to exercise the production transaction code on the host with simulated NVS write failures and power cuts. The test covers empty/full vaults, legacy PIN lengths, favorites/settings preservation and repeated recovery interruptions. Cryptography is mocked in this host test; hardware power-loss and USB/touch behavior still require device validation.
 - **Wi-Fi:** shows the SSID, password and URL of the access point.
 
 ### Security model

@@ -18,7 +18,8 @@ TFT_eSPI tft = TFT_eSPI();
 #include "vault_web.h"
 
 // ---- State machine ----
-enum State { ST_PIN_SETUP, ST_PIN_CONFIRM, ST_PIN_ENTRY, ST_MENU, ST_DETAIL, ST_WEB, ST_SEARCH, ST_SETTINGS, ST_THEMES };
+enum State { ST_PIN_SETUP, ST_PIN_CONFIRM, ST_PIN_ENTRY, ST_MENU, ST_DETAIL, ST_WEB, ST_SEARCH, ST_SETTINGS, ST_THEMES,
+             ST_PIN_CURRENT, ST_PIN_NEW, ST_PIN_NEW_CONFIRM };
 State state = ST_PIN_ENTRY;
 
 char pinBuf[PIN_LEN_MAX + 1]     = "";
@@ -82,6 +83,18 @@ void drawSearch();
 void drawSettings();
 void drawPinScreen(const char* title);
 void lockDevice();
+void clearPinBuffers();
+
+bool changingPin() {
+  return state == ST_PIN_CURRENT || state == ST_PIN_NEW || state == ST_PIN_NEW_CONFIRM;
+}
+
+void cancelPinChange() {
+  clearPinBuffers();
+  pinLen = storagePinLen();
+  state = ST_SETTINGS;
+  drawSettings();
+}
 
 bool inBox(int tx, int ty, int bx, int by, int bw, int bh) {
   return tx >= bx && tx < bx + bw && ty >= by && ty < by + bh;
@@ -151,11 +164,17 @@ void drawPinBoxes() {
 }
 
 void drawPinScreen(const char* title) {
-  focusBegin(ST_PIN_ENTRY);
+  focusBegin(changingPin() ? state : ST_PIN_ENTRY);
   tft.fillScreen(C_BG);
   tft.setTextColor(C_ACCENT);
   tft.setTextDatum(TC_DATUM);
-  tft.drawString(title, SCR_W / 2, PIN_TITLE_Y, 4);
+#ifdef USE_LANDSCAPE
+  if (changingPin()) {
+    tft.setTextDatum(TL_DATUM);
+    tft.drawString(title, 10, PIN_TITLE_Y, 2);
+  } else
+#endif
+    tft.drawString(title, SCR_W / 2, PIN_TITLE_Y, 4);
 
   tft.setTextColor(C_DIM);
   tft.setTextDatum(TC_DATUM);
@@ -165,6 +184,13 @@ void drawPinScreen(const char* title) {
 
   drawPinBoxes();
   drawNumpad();
+  if (changingPin()) {
+#ifdef USE_LANDSCAPE
+    btn(SCR_W - 82, 4, 74, 26, "Cancelar", C_BTN);
+#else
+    btn(10, 286, SCR_W - 20, 28, "Cancelar", C_BTN);
+#endif
+  }
   focusEnd();
 }
 
@@ -249,6 +275,14 @@ void drawBusy(const char* msg) {
 }
 
 void handlePinTouch(int tx, int ty) {
+  if (changingPin()) {
+#ifdef USE_LANDSCAPE
+    bool cancel = inBox(tx, ty, SCR_W - 82, 4, 74, 26);
+#else
+    bool cancel = inBox(tx, ty, 10, 286, SCR_W - 20, 28);
+#endif
+    if (cancel) { cancelPinChange(); return; }
+  }
   int key = hitNumpad(tx, ty);
   if (key < 0) return;
 
@@ -296,7 +330,33 @@ void handlePinTouch(int tx, int ty) {
         drawPinWarn("PINs diferentes!");
       }
 
-    } else if (state == ST_PIN_ENTRY) {
+    } else if (state == ST_PIN_NEW) {
+      memcpy(pinConfirm, pinBuf, sizeof(pinConfirm));
+      mbedtls_platform_zeroize(pinBuf, sizeof(pinBuf));
+      pinPos = 0;
+      state = ST_PIN_NEW_CONFIRM;
+      drawPinScreen("Confirme PIN");
+    } else if (state == ST_PIN_NEW_CONFIRM) {
+      if (strcmp(pinBuf, pinConfirm) != 0) {
+        clearPinBuffers();
+        state = ST_PIN_NEW;
+        drawPinScreen("Novo PIN");
+        drawPinWarn("PINs diferentes!");
+        return;
+      }
+      drawBusy("Salvando PIN...");
+      PinChangeResult result = changePin(pinBuf);
+      clearPinBuffers();
+      if (result == PIN_CHANGE_PENDING) {
+        clearMemory();
+        ESP.restart();  // replay da transacao antes de permitir novo desbloqueio
+        return;
+      }
+      lockDevice();
+      if (result == PIN_CHANGE_OK) drawBusy("PIN alterado!");
+      else drawPinWarn("Falha ao salvar");
+    } else if (state == ST_PIN_ENTRY || state == ST_PIN_CURRENT) {
+      bool change = state == ST_PIN_CURRENT;
       // Conta o erro ANTES de verificar: desligar no meio nao zera o contador
       int fails = storageAddFail();
       drawBusy("Verificando...");
@@ -305,14 +365,20 @@ void handlePinTouch(int tx, int ty) {
 
       if (ok) {
         storageResetFails();
-        loadCredentials();
-        state = ST_MENU;
-        drawMenu();
-      } else if (WIPE_AFTER > 0 && fails >= WIPE_AFTER) {
-        wipeVault();
-      } else if (fails >= LOCKOUT_AFTER) {
-        startLockout(fails);
+        if (change) {
+          pinLen = PIN_LEN;
+          state = ST_PIN_NEW;
+          drawPinScreen("Novo PIN");
+        } else {
+          loadCredentials();
+          state = ST_MENU;
+          drawMenu();
+        }
       } else {
+        // A verificacao invalida a chave em RAM: termina a sessao desbloqueada.
+        if (change) lockDevice();
+        if (WIPE_AFTER > 0 && fails >= WIPE_AFTER) { wipeVault(); return; }
+        if (fails >= LOCKOUT_AFTER) { startLockout(fails); return; }
         drawPinScreen("Digite PIN");
         char msg[24];
         snprintf(msg, sizeof(msg), "PIN errado (%d/%d)", fails, LOCKOUT_AFTER);
@@ -730,10 +796,11 @@ void handleDetailTouch(int tx, int ty) {
 // ---- Configuracoes ----
 #define SETTINGS_X       10
 #define SETTINGS_W       (SCR_W - 20)
-#define SETTINGS_H       38
-#define SETTINGS_LOCK_Y  42
-#define SETTINGS_WIFI_Y  110
-#define SETTINGS_THEME_Y 152
+#define SETTINGS_H       30
+#define SETTINGS_LOCK_Y  38
+#define SETTINGS_WIFI_Y  96
+#define SETTINGS_THEME_Y 130
+#define SETTINGS_PIN_Y   164
 #define SETTINGS_BACK_Y  (SCR_H - SETTINGS_H - 8)
 
 void drawSettings() {
@@ -754,6 +821,7 @@ void drawSettings() {
   tft.drawString("Pressione para mudar", SCR_W / 2, SETTINGS_LOCK_Y + SETTINGS_H + 6, 2);
   btn(SETTINGS_X, SETTINGS_WIFI_Y, SETTINGS_W, SETTINGS_H, "Ativar WiFi", C_BTN);
   btn(SETTINGS_X, SETTINGS_THEME_Y, SETTINGS_W, SETTINGS_H, "Temas", C_ACCENT);
+  btn(SETTINGS_X, SETTINGS_PIN_Y, SETTINGS_W, SETTINGS_H, "Alterar PIN", C_BTN);
   btn(SETTINGS_X, SETTINGS_BACK_Y, SETTINGS_W, SETTINGS_H, "Voltar", C_BTN);
   focusEnd();
 }
@@ -815,6 +883,11 @@ void handleSettingsTouch(int tx, int ty) {
   } else if (inBox(tx, ty, SETTINGS_X, SETTINGS_THEME_Y, SETTINGS_W, SETTINGS_H)) {
     state = ST_THEMES;
     drawThemes();
+  } else if (inBox(tx, ty, SETTINGS_X, SETTINGS_PIN_Y, SETTINGS_W, SETTINGS_H)) {
+    clearPinBuffers();
+    pinLen = storagePinLen();
+    state = ST_PIN_CURRENT;
+    drawPinScreen("PIN atual");
   } else if (inBox(tx, ty, SETTINGS_X, SETTINGS_BACK_Y, SETTINGS_W, SETTINGS_H)) {
     state = ST_MENU;
     drawMenu();
@@ -859,6 +932,11 @@ void handleWebTouch(int tx, int ty) {
 // ---- Gesto "voltar" (botao fisico segurado) ----
 void handleBack() {
   switch (state) {
+    case ST_PIN_CURRENT:
+    case ST_PIN_NEW:
+    case ST_PIN_NEW_CONFIRM:
+      cancelPinChange();
+      break;
     case ST_PIN_SETUP:
     case ST_PIN_CONFIRM:
     case ST_PIN_ENTRY:
@@ -894,6 +972,7 @@ void lockDevice() {
   clearMemory();
   clearPinBuffers();
   clearSearch();
+  pinLen = storagePinLen();
   state = ST_PIN_ENTRY;
   drawPinScreen("Digite PIN");
 }
@@ -915,7 +994,16 @@ void setup() {
   inputBegin();
   kbdBegin();
 
-  storageBegin();
+  if (!storageBegin()) {
+    clearMemory();
+    focusBegin(-1);
+    tft.fillScreen(C_BG);
+    tft.setTextColor(C_WARN);
+    tft.setTextDatum(MC_DATUM);
+    tft.drawString("Falha no storage", SCR_W / 2, SCR_H / 2 - 12, 2);
+    tft.drawString("Reinicie o aparelho", SCR_W / 2, SCR_H / 2 + 12, 2);
+    return;
+  }
 
   if (storageHasPin()) {
     pinLen = storagePinLen();
@@ -934,6 +1022,7 @@ void setup() {
 
 // ===================== LOOP =====================
 void loop() {
+  if (!storageReady) return;
   // Mantem a confirmacao visivel sem bloquear o loop ou o auto-lock.
   if (state == ST_DETAIL && typingFeedbackVisible &&
       millis() - typingFeedbackShownAt >= TYPING_FEEDBACK_MS) {
@@ -969,7 +1058,7 @@ void loop() {
     return;
   }
 
-  if ((state == ST_MENU || state == ST_DETAIL || state == ST_SEARCH || state == ST_SETTINGS || state == ST_THEMES) && millis() - lastAction >= autoLockMs) {
+  if ((state == ST_MENU || state == ST_DETAIL || state == ST_SEARCH || state == ST_SETTINGS || state == ST_THEMES || changingPin()) && millis() - lastAction >= autoLockMs) {
     lockDevice();
     return;
   }
@@ -995,6 +1084,9 @@ void loop() {
     case ST_PIN_SETUP:
     case ST_PIN_CONFIRM:
     case ST_PIN_ENTRY:
+    case ST_PIN_CURRENT:
+    case ST_PIN_NEW:
+    case ST_PIN_NEW_CONFIRM:
       handlePinTouch(tx, ty);
       break;
     case ST_MENU:
