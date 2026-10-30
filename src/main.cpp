@@ -411,7 +411,8 @@ void handlePinTouch(int tx, int ty) {
 // Placas sem gesto de swipe ganham uma coluna de botoes cima/baixo ao lado da lista
 #ifdef MENU_SCROLL_BTNS
   #define MENU_SCR_W   44
-  #define MENU_ITEM_W  (SCR_W - 8 - MENU_SCR_W - 4)
+  // Cards so cedem espaco aos botoes quando ha rolagem
+  #define MENU_ITEM_W  (filtCount > MENU_VISIBLE ? SCR_W - 8 - MENU_SCR_W - 4 : SCR_W - 8)
   #define MENU_SCR_X   (SCR_W - 4 - MENU_SCR_W)
   #define MENU_SCR_H   ((MENU_VISIBLE * MENU_ITEM_H - 2 - 4) / 2)
   #define MENU_UP_Y    MENU_LIST_Y
