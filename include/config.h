@@ -34,10 +34,9 @@
 
 #elif defined(BOARD_CYD)
   #define BOARD_NAME      "CYD 2432S028"
-  #define SCR_W           320
-  #define SCR_H           240
-  #define TFT_ROTATION    1
-  #define USE_LANDSCAPE
+  #define SCR_W           240
+  #define SCR_H           320
+  #define TFT_ROTATION    2    // retrato com as entradas USB para baixo
   #define PIN_POWER_ON    -1
   // XPT2046 em barramento SPI separado (VSPI)
   #define XPT_CLK         25
@@ -46,10 +45,11 @@
   #define XPT_CS          33
   #define XPT_IRQ         36
   // Faixa crua do ADC — ajuste se o toque estiver deslocado
-  #define XPT_X_MIN       200
-  #define XPT_X_MAX       3700
-  #define XPT_Y_MIN       240
-  #define XPT_Y_MAX       3800
+  // Rotacao 2 do XPT2046: X = Y original, Y = 4095 - X original.
+  #define XPT_X_MIN       240
+  #define XPT_X_MAX       3800
+  #define XPT_Y_MIN       395
+  #define XPT_Y_MAX       3895
   #define TOUCH_DEBOUNCE  300
   #define KBD_BLE
   #define MENU_SCROLL_BTNS   // touch resistivo sem gesto: botoes de rolagem no menu

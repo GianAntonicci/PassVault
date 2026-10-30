@@ -44,7 +44,7 @@ unsigned long lockoutEnd = 0;
 unsigned long lockoutTick = 0;
 unsigned long lastAction = 0;
 
-// ---- Layout: portrait 170x320 vs landscape 320x240 ----
+// ---- Layout: portrait 170x320 / 240x320 vs landscape 320x240 ----
 #ifdef USE_LANDSCAPE
   #define PIN_TITLE_Y   6
   #define PIN_MSG_Y     36

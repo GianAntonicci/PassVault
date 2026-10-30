@@ -23,7 +23,8 @@ PassVault is a hardware password manager running on ESP32 boards. It stores encr
 |--------------------------|---------------------------|--------------------|----------------------|----------|
 | `tdisplay-s3-touch`      | LilyGO T-Display S3 Touch | ST7789 170×320 parallel 8-bit | CST816S (capacitive touch) | USB HID |
 | `tdisplay-s3`            | LilyGO T-Display S3       | ST7789 170×320 parallel 8-bit | 2 physical buttons (GPIO 0, 14) | USB HID |
-| `cyd-2432s028`           | CYD ESP32-2432S028         | ILI9341 240×320 SPI | XPT2046 (resistive touch) | BLE |
+| `cyd-2432s028`           | CYD ESP32-2432S028 (1 USB) | ILI9341 240×320 SPI | XPT2046 (resistive touch) | BLE |
+| `cyd-2432s028-2usb`      | CYD ESP32-2432S028 (2 USB) | ILI9341_2 240×320 SPI, inverted | XPT2046 (resistive touch) | BLE |
 | `generic-ili9341`        | Generic ESP32 + ILI9341    | ILI9341 240×320 SPI | XPT2046 (resistive touch) | BLE |
 
 To build for a specific board: `pio run -e <environment>`
@@ -77,7 +78,8 @@ ST_PIN_ENTRY  →  ST_MENU  →  ST_DETAIL
 
 Layout is selected at compile time:
 - **Portrait (170×320)**: T-Display S3 / T-Display S3 Touch
-- **Landscape (320×240)**: CYD / Generic ILI9341
+- **Portrait (240×320)**: CYD (both versions)
+- **Landscape (320×240)**: Generic ILI9341
 - **`MENU_SCROLL_BTNS`**: On-screen scroll buttons for boards without swipe (CYD, generic, buttons)
 
 ## Security

@@ -29,7 +29,8 @@ It is a PlatformIO project with one firmware and a build environment for each su
 |---|---|---|---|---|---|
 | `tdisplay-s3-touch` | LilyGO T-Display S3 Touch | ESP32-S3 | ST7789 170×320, 8-bit parallel, portrait | CST816S capacitive (I²C) with gestures | USB HID |
 | `tdisplay-s3` | LilyGO T-Display S3 (no touch) | ESP32-S3 | ST7789 170×320, 8-bit parallel, portrait | 2 physical buttons (GPIO0 / GPIO14) | USB HID |
-| `cyd-2432s028` | "Cheap Yellow Display" ESP32-2432S028 | ESP32 | ILI9341 320×240 SPI, landscape | XPT2046 resistive (own SPI bus) | BLE |
+| `cyd-2432s028` | "Cheap Yellow Display" ESP32-2432S028, 1 USB (micro-USB) | ESP32 | ILI9341 240×320 SPI, portrait | XPT2046 resistive (own SPI bus) | BLE |
+| `cyd-2432s028-2usb` | "Cheap Yellow Display" ESP32-2432S028, 2 USB (micro-USB + USB-C) | ESP32 | ILI9341 (`ILI9341_2_DRIVER`, inverted) 240×320 SPI, portrait | XPT2046 resistive (own SPI bus) | BLE |
 | `generic-ili9341` | Any ESP32 + ILI9341 module | ESP32 | ILI9341 320×240 SPI, landscape | XPT2046 resistive (shared SPI bus) | BLE |
 
 ---
@@ -80,8 +81,8 @@ pio device monitor                           # optional, 115200 baud
 |---|---|
 | T-Display S3 Touch | `tdisplay-s3-touch` |
 | T-Display S3 (no touch) | `tdisplay-s3` |
-| CYD ESP32-2432S028 | `cyd-2432s028` |
-| CYD ESP32-2432S028 with ST7789 (micro-USB + USB-C variant) | `cyd-2432s028-2usb` |
+| CYD ESP32-2432S028, 1 USB (micro-USB) | `cyd-2432s028` |
+| CYD ESP32-2432S028, 2 USB (micro-USB + USB-C) | `cyd-2432s028-2usb` |
 | Generic ESP32 + ILI9341 | `generic-ili9341` |
 
 **Notes**
@@ -456,22 +457,25 @@ The display pins are the same as on the Touch version. Navigation uses the two s
 
 The focused button has a cyan outline. In the menu, moving past the first or last visible item scrolls the list. You can change the hold time with `BTN_LONG_MS` in `config.h`.
 
-### CYD ESP32-2432S028 — `cyd-2432s028`
+### CYD ESP32-2432S028 — `cyd-2432s028` / `cyd-2432s028-2usb`
 
+- **Orientation:** portrait 240×320, with the USB connectors at the bottom (`TFT_ROTATION=2`). The touch uses the same rotation.
 - **Display:** ILI9341 on HSPI (`USE_HSPI_PORT`) with MISO 12, MOSI 13, SCLK 14, CS 15, DC 2, RST –1 and backlight 21, at 27 MHz SPI.
 - **Touch:** the XPT2046 is on its **own VSPI bus**: CLK 25, MOSI 32, MISO 39, CS 33, IRQ 36. `tft.getTouch()` cannot reach it, so this board uses the `PaulStoffregen/XPT2046_Touchscreen` library.
 - **Calibration:** if taps land in the wrong place, adjust the raw ADC range in `config.h`:
 
   ```cpp
-  #define XPT_X_MIN 200
-  #define XPT_X_MAX 3700
-  #define XPT_Y_MIN 240
-  #define XPT_Y_MAX 3800
+  #define XPT_X_MIN 240
+  #define XPT_X_MAX 3800
+  #define XPT_Y_MIN 395
+  #define XPT_Y_MAX 3895
   ```
 
   Print `touch.getPoint()` over Serial while touching the corners to find your values. If an axis is mirrored, swap its MIN and MAX.
-- **Display variants:** some CYD revisions need `-DILI9341_2_DRIVER=1` instead of `-DILI9341_DRIVER=1`, or need `-DTFT_INVERSION_ON=1`. Use those if the colours look inverted or the image is garbled.
-- **ST7789 variant (often micro-USB + USB-C):** use `pio run -e cyd-2432s028-2usb --target upload`. This profile replaces the ILI9341 driver with ST7789, uses BGR colours and keeps the 320×240 landscape layout and separate touch SPI bus. Either USB connector can be used for flashing. USB connector count alone does not guarantee the panel type; keep `cyd-2432s028` for ILI9341 panels. If only the colours are inverted, change `TFT_INVERSION_OFF` to `TFT_INVERSION_ON` in the ST7789 profile.
+- **Versions:** both share pins, touch and layout (`[cyd_base]` in `platformio.ini`) and differ only in the display driver:
+  - `cyd-2432s028` — 1 USB (micro-USB): `ILI9341_DRIVER`.
+  - `cyd-2432s028-2usb` — 2 USB (micro-USB + USB-C): `ILI9341_2_DRIVER` with `TFT_INVERSION_ON`. On the 1-USB profile this panel shows inverted colours and a rotated, garbled image.
+  - USB connector count usually identifies the panel, but not always. If neither profile looks right, try `-DST7789_DRIVER=1` in the 2-USB profile.
 - **Keyboard:** BLE (see [BLE keyboard](#ble-keyboard-classic-esp32-boards)).
 
 ### Generic ESP32 + ILI9341 — `generic-ili9341`
@@ -537,7 +541,7 @@ Display driver and pin settings for TFT_eSPI are passed as `build_flags` in `pla
 3. **Add input support if needed:** if the board's input hardware is new, add a branch to `include/input.h` that implements `inputBegin()` and `inputRead()`.
 4. **Build it** with `pio run -e my-board`.
 
-The layout in `main.cpp` supports two sizes: portrait 170×320 and landscape 320×240. Other resolutions may need changes to the `PIN_*`, `NP_*` and `WEB_*` layout constants at the top of `main.cpp`.
+The layout in `main.cpp` supports portrait 170×320 / 240×320 and landscape 320×240. Other resolutions may need changes to the `PIN_*`, `NP_*` and `WEB_*` layout constants at the top of `main.cpp`.
 
 ---
 
@@ -605,6 +609,6 @@ See Espressif's documentation for the exact steps for your chip (ESP32 and ESP32
 | Nothing typed on BLE boards | Check that `BLE` is green in the menu and pair again if needed. On macOS, accept the keyboard-identification prompt |
 | Wrong characters typed | Set the host keyboard layout to **US**. HID sends US key codes |
 | Touch offset or mirrored (CYD / generic) | Recalibrate (see the board sections above) |
-| White or garbled CYD screen | Try `ILI9341_2_DRIVER` and/or `TFT_INVERSION_ON` |
+| White, inverted or garbled CYD screen | Try the other CYD profile (`cyd-2432s028` ↔ `cyd-2432s028-2usb`) |
 | Forgot the PIN | Enter 10 wrong PINs, or erase the flash with `pio run -e <env> -t erase` and upload again. **All credentials are lost** |
 | Unlock takes too long | Lower `KDF_ITERS` (this makes offline guessing faster) |
