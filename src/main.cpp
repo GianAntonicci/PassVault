@@ -16,11 +16,30 @@ TFT_eSPI tft = TFT_eSPI();
 #include "keyboard.h"
 #include "vault_core.h"
 #include "vault_web.h"
+#include "screen_fade.h"
 
 // ---- State machine ----
 enum State { ST_PIN_SETUP, ST_PIN_CONFIRM, ST_PIN_ENTRY, ST_MENU, ST_DETAIL, ST_WEB, ST_SEARCH, ST_SETTINGS, ST_THEMES, ST_BRIGHTNESS,
              ST_PIN_CURRENT, ST_PIN_NEW, ST_PIN_NEW_CONFIRM };
 State state = ST_PIN_ENTRY;
+ScreenFade screenFade;
+
+// O fade multiplica o brilho escolhido sem alterar a preferencia na NVS.
+void applyBrightness() {
+  int duty = (displayBrightness * 255 + 50) / 100;
+  duty = (duty * screenFade.level + 127) / 255;
+  analogWrite(TFT_BL, TFT_BACKLIGHT_ON == HIGH ? duty : 255 - duty);
+}
+
+void beginScreen() {
+  // Apaga o backlight antes de substituir os pixels da tela anterior.
+  if (screenFade.begin(state, millis())) applyBrightness();
+}
+
+void cancelScreenFade() {
+  screenFade.cancel();
+  applyBrightness();
+}
 
 char pinBuf[PIN_LEN_MAX + 1]     = "";
 char pinConfirm[PIN_LEN_MAX + 1] = "";
@@ -164,6 +183,7 @@ void drawPinBoxes() {
 }
 
 void drawPinScreen(const char* title) {
+  beginScreen();
   focusBegin(changingPin() ? state : ST_PIN_ENTRY);
   tft.fillScreen(C_BG);
   tft.setTextColor(C_ACCENT);
@@ -246,6 +266,7 @@ void drawLockout() {
 }
 
 void startLockout(int fails) {
+  cancelScreenFade();
   lockoutEnd = millis() + lockoutDuration(fails);
   lockoutTick = 0;
   focusBegin(-1);
@@ -255,6 +276,7 @@ void startLockout(int fails) {
 
 // Limite atingido: apaga o vault e reinicia em "Criar PIN"
 void wipeVault() {
+  cancelScreenFade();
   storageWipe();
   clearPinBuffers();
   focusBegin(-1);
@@ -467,6 +489,7 @@ void clearSearch() {
 }
 
 void drawMenu() {
+  beginScreen();
   detailPasswordVisible = false;
   focusBegin(ST_MENU);
   applyFilter();
@@ -611,6 +634,7 @@ void drawSearchField() {
 }
 
 void drawSearch() {
+  beginScreen();
   focusBegin(ST_SEARCH);
   tft.fillScreen(C_BG);
   tft.setTextColor(C_ACCENT);
@@ -659,6 +683,7 @@ void handleSearchTouch(int tx, int ty) {
 
 // ---- Detail ----
 void drawTypingFeedback(const char* message, uint16_t color) {
+  cancelScreenFade();
   // Oculta os dados e retira o foco dos botoes durante o envio.
   detailPasswordVisible = false;
   focusBegin(-1);
@@ -743,6 +768,7 @@ void drawDetailPassword() {
 }
 
 void drawDetail() {
+  beginScreen();
   const uint16_t detColors[DET_BTN_COUNT] = {C_OK, C_ACCENT, C_ACCENT, C_DIM, C_ACCENT, C_WARN};
   typingFeedbackVisible = false;
   detailPasswordVisible = false;
@@ -815,6 +841,7 @@ void handleDetailTouch(int tx, int ty) {
 #define SETTINGS_BACK_Y  (SCR_H - SETTINGS_H - 8)
 
 void drawSettings() {
+  beginScreen();
   focusBegin(ST_SETTINGS);
   tft.fillScreen(C_BG);
   tft.setTextColor(C_ACCENT);
@@ -840,17 +867,12 @@ void drawSettings() {
   focusEnd();
 }
 
-// ---- Brilho: PWM de 8 bits, respeitando a polaridade do backlight ----
-void applyBrightness() {
-  int duty = (displayBrightness * 255 + 50) / 100;
-  analogWrite(TFT_BL, TFT_BACKLIGHT_ON == HIGH ? duty : 255 - duty);
-}
-
 #define BRIGHT_BTN_Y  108
 #define BRIGHT_BTN_W  ((SETTINGS_W - 12) / 2)
 #define BRIGHT_BTN_H  38
 
 void drawBrightness(const char* status = "", bool failed = false) {
+  beginScreen();
   focusBegin(ST_BRIGHTNESS);
   tft.fillScreen(C_BG);
   tft.setTextColor(C_ACCENT);
@@ -892,6 +914,7 @@ void handleBrightnessTouch(int tx, int ty) {
 #define THEME_STEP   34
 
 void drawThemes(const char* status = "", bool failed = false) {
+  beginScreen();
   focusBegin(ST_THEMES);
   tft.fillScreen(C_BG);
   tft.setTextColor(C_ACCENT);
@@ -969,6 +992,7 @@ void handleSettingsTouch(int tx, int ty) {
 #define WEB_BTN_H  42
 
 void drawWebScreen() {
+  beginScreen();
   focusBegin(ST_WEB);
   tft.fillScreen(C_BG);
   tft.setTextColor(C_ACCENT);
@@ -1097,6 +1121,7 @@ void setup() {
 // ===================== LOOP =====================
 void loop() {
   if (!storageReady) return;
+  if (screenFade.tick(millis())) applyBrightness();
   // Mantem a confirmacao visivel sem bloquear o loop ou o auto-lock.
   if (state == ST_DETAIL && typingFeedbackVisible &&
       millis() - typingFeedbackShownAt >= TYPING_FEEDBACK_MS) {
@@ -1141,7 +1166,10 @@ void loop() {
   if (state == ST_MENU && kbdConnected() != kbdShownConnected) drawKbdStatus();
 
   int tx, ty, gesture;
+  bool fading = screenFade.active;
   if (!inputRead(tx, ty, gesture)) return;
+  // Consome toques durante o fade para nao ativar a tela recem-aberta.
+  if (fading) return;
   if (state == ST_DETAIL && typingFeedbackVisible) return;
 
   static unsigned long lastTouch = 0;
