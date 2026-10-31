@@ -1,0 +1,1078 @@
+{
+  "languages": [
+    {
+      "code": "pt-BR",
+      "name": "Português"
+    },
+    {
+      "code": "en",
+      "name": "English"
+    },
+    {
+      "code": "es",
+      "name": "Español"
+    },
+    {
+      "code": "zh-CN",
+      "name": "简体中文"
+    },
+    {
+      "code": "it",
+      "name": "Italiano"
+    },
+    {
+      "code": "ja",
+      "name": "日本語"
+    },
+    {
+      "code": "de",
+      "name": "Deutsch"
+    },
+    {
+      "code": "ru",
+      "name": "Русский"
+    }
+  ],
+  "strings": {
+    "language": [
+      "Idioma",
+      "Language",
+      "Idioma",
+      "语言",
+      "Lingua",
+      "言語",
+      "Sprache",
+      "Язык"
+    ],
+    "language_saved": [
+      "Idioma salvo",
+      "Language saved",
+      "Idioma guardado",
+      "语言已保存",
+      "Lingua salvata",
+      "言語を保存しました",
+      "Sprache gespeichert",
+      "Язык сохранён"
+    ],
+    "language_error": [
+      "Erro ao salvar idioma",
+      "Cannot save language",
+      "Error al guardar idioma",
+      "无法保存语言",
+      "Errore salvataggio lingua",
+      "言語を保存できません",
+      "Sprache nicht gespeichert",
+      "Не удалось сохранить язык"
+    ],
+    "back": [
+      "Voltar",
+      "Back",
+      "Volver",
+      "返回",
+      "Indietro",
+      "戻る",
+      "Zurück",
+      "Назад"
+    ],
+    "cancel": [
+      "Cancelar",
+      "Cancel",
+      "Cancelar",
+      "取消",
+      "Annulla",
+      "キャンセル",
+      "Abbrechen",
+      "Отмена"
+    ],
+    "save": [
+      "Salvar",
+      "Save",
+      "Guardar",
+      "保存",
+      "Salva",
+      "保存",
+      "Speichern",
+      "Сохранить"
+    ],
+    "saved": [
+      "Salvo",
+      "Saved",
+      "Guardado",
+      "已保存",
+      "Salvato",
+      "保存しました",
+      "Gespeichert",
+      "Сохранено"
+    ],
+    "save_failed": [
+      "Falha ao salvar",
+      "Save failed",
+      "Error al guardar",
+      "保存失败",
+      "Errore salvataggio",
+      "保存に失敗",
+      "Speichern fehlgeschlagen",
+      "Ошибка сохранения"
+    ],
+    "error": [
+      "Erro",
+      "Error",
+      "Error",
+      "错误",
+      "Errore",
+      "エラー",
+      "Fehler",
+      "Ошибка"
+    ],
+    "load_error": [
+      "Erro ao carregar",
+      "Loading failed",
+      "Error al cargar",
+      "加载失败",
+      "Errore caricamento",
+      "読み込みに失敗",
+      "Laden fehlgeschlagen",
+      "Ошибка загрузки"
+    ],
+    "settings": [
+      "Configurações",
+      "Settings",
+      "Ajustes",
+      "设置",
+      "Impostazioni",
+      "設定",
+      "Einstellungen",
+      "Настройки"
+    ],
+    "settings_short": [
+      "Config.",
+      "Settings",
+      "Ajustes",
+      "设置",
+      "Impost.",
+      "設定",
+      "Optionen",
+      "Настройки"
+    ],
+    "lock": [
+      "Bloquear",
+      "Lock",
+      "Bloquear",
+      "锁定",
+      "Blocca",
+      "ロック",
+      "Sperren",
+      "Закрыть"
+    ],
+    "search": [
+      "Buscar",
+      "Search",
+      "Buscar",
+      "搜索",
+      "Cerca",
+      "検索",
+      "Suchen",
+      "Поиск"
+    ],
+    "search_hint": [
+      "Buscar...",
+      "Search...",
+      "Buscar...",
+      "搜索...",
+      "Cerca...",
+      "検索...",
+      "Suchen...",
+      "Поиск..."
+    ],
+    "clear": [
+      "Limpar",
+      "Clear",
+      "Limpiar",
+      "清除",
+      "Cancella",
+      "クリア",
+      "Leeren",
+      "Очистить"
+    ],
+    "none_found": [
+      "Nada encontrado",
+      "No matches",
+      "Sin resultados",
+      "没有匹配项",
+      "Nessun risultato",
+      "見つかりません",
+      "Keine Treffer",
+      "Не найдено"
+    ],
+    "no_credentials": [
+      "Nenhuma credencial",
+      "No credentials",
+      "Sin credenciales",
+      "没有凭据",
+      "Nessuna credenziale",
+      "認証情報なし",
+      "Keine Zugangsdaten",
+      "Нет учётных данных"
+    ],
+    "name": [
+      "Nome",
+      "Name",
+      "Nombre",
+      "名称",
+      "Nome",
+      "名前",
+      "Name",
+      "Название"
+    ],
+    "user": [
+      "Usuário",
+      "Username",
+      "Usuario",
+      "用户名",
+      "Utente",
+      "ユーザー名",
+      "Benutzer",
+      "Пользователь"
+    ],
+    "password": [
+      "Senha",
+      "Password",
+      "Contraseña",
+      "密码",
+      "Password",
+      "パスワード",
+      "Passwort",
+      "Пароль"
+    ],
+    "type": [
+      "Tipo",
+      "Type",
+      "Tipo",
+      "类型",
+      "Tipo",
+      "種類",
+      "Typ",
+      "Тип"
+    ],
+    "cat_none": [
+      "Sem tipo",
+      "No type",
+      "Sin tipo",
+      "未分类",
+      "Senza tipo",
+      "未分類",
+      "Ohne Typ",
+      "Без типа"
+    ],
+    "cat_social": [
+      "Redes Sociais",
+      "Social Media",
+      "Redes Sociales",
+      "社交网络",
+      "Social",
+      "SNS",
+      "Soziale Medien",
+      "Соцсети"
+    ],
+    "cat_email": [
+      "Email",
+      "Email",
+      "Correo",
+      "邮箱",
+      "Email",
+      "メール",
+      "E-Mail",
+      "Почта"
+    ],
+    "cat_bank": [
+      "Banco",
+      "Bank",
+      "Banco",
+      "银行",
+      "Banca",
+      "銀行",
+      "Bank",
+      "Банк"
+    ],
+    "cat_work": [
+      "Trabalho",
+      "Work",
+      "Trabajo",
+      "工作",
+      "Lavoro",
+      "仕事",
+      "Arbeit",
+      "Работа"
+    ],
+    "sort": [
+      "Ordenar",
+      "Sort",
+      "Ordenar",
+      "排序",
+      "Ordina",
+      "並べ替え",
+      "Sortieren",
+      "Порядок"
+    ],
+    "sort_title": [
+      "Ordenação",
+      "Sort order",
+      "Ordenación",
+      "排序方式",
+      "Ordinamento",
+      "表示順",
+      "Sortierung",
+      "Сортировка"
+    ],
+    "sort_by": [
+      "Ordenar por",
+      "Sort by",
+      "Ordenar por",
+      "排序方式",
+      "Ordina per",
+      "並べ替え",
+      "Sortieren nach",
+      "Сортировать по"
+    ],
+    "sort_alpha": [
+      "Alfabética",
+      "Alphabetical",
+      "Alfabética",
+      "按名称",
+      "Alfabetico",
+      "名前順",
+      "Alphabetisch",
+      "По алфавиту"
+    ],
+    "sort_recent": [
+      "Mais recente",
+      "Newest",
+      "Más reciente",
+      "最新添加",
+      "Più recenti",
+      "新しい順",
+      "Neueste",
+      "Новые"
+    ],
+    "sort_used": [
+      "Mais usada",
+      "Most used",
+      "Más usada",
+      "最常使用",
+      "Più usate",
+      "使用回数順",
+      "Meistgenutzt",
+      "Частые"
+    ],
+    "sort_type": [
+      "Por tipo",
+      "By type",
+      "Por tipo",
+      "按类型",
+      "Per tipo",
+      "種類順",
+      "Nach Typ",
+      "По типу"
+    ],
+    "sort_saved": [
+      "Ordem salva",
+      "Order saved",
+      "Orden guardado",
+      "排序已保存",
+      "Ordine salvato",
+      "表示順を保存",
+      "Reihenfolge gespeichert",
+      "Порядок сохранён"
+    ],
+    "sort_error": [
+      "Erro ao salvar ordem",
+      "Cannot save order",
+      "Error al guardar orden",
+      "无法保存排序",
+      "Errore salvataggio ordine",
+      "表示順を保存できません",
+      "Sortierung nicht gespeichert",
+      "Ошибка сохранения порядка"
+    ],
+    "sort_load_error": [
+      "Erro ao carregar ordem",
+      "Cannot load order",
+      "Error al cargar orden",
+      "无法加载排序",
+      "Errore caricamento ordine",
+      "表示順を読み込めません",
+      "Sortierung nicht geladen",
+      "Ошибка загрузки порядка"
+    ],
+    "all": [
+      "Tudo",
+      "All",
+      "Todo",
+      "全部",
+      "Tutto",
+      "すべて",
+      "Alles",
+      "Всё"
+    ],
+    "login": [
+      "Login",
+      "Login",
+      "Usuario",
+      "账号",
+      "Login",
+      "ログイン",
+      "Login",
+      "Логин"
+    ],
+    "reveal": [
+      "Revelar",
+      "Reveal",
+      "Mostrar",
+      "显示",
+      "Mostra",
+      "表示",
+      "Anzeigen",
+      "Показать"
+    ],
+    "favorite": [
+      "Favoritar",
+      "Favorite",
+      "Favorito",
+      "收藏",
+      "Preferito",
+      "お気に入り",
+      "Merken",
+      "Избранное"
+    ],
+    "unfavorite": [
+      "Desmarcar",
+      "Unmark",
+      "Desmarcar",
+      "取消收藏",
+      "Rimuovi",
+      "解除",
+      "Entfernen",
+      "Убрать"
+    ],
+    "unfavorite_long": [
+      "Desmarcar favorita",
+      "Remove favorite",
+      "Quitar favorito",
+      "取消收藏",
+      "Rimuovi preferito",
+      "お気に入り解除",
+      "Favorit entfernen",
+      "Убрать из избранного"
+    ],
+    "favorite_error": [
+      "Erro ao favoritar",
+      "Cannot update favorite",
+      "Error al marcar favorito",
+      "无法更新收藏",
+      "Errore preferito",
+      "お気に入り更新失敗",
+      "Favorit nicht gespeichert",
+      "Ошибка избранного"
+    ],
+    "enter": [
+      "Entrar",
+      "Enter",
+      "Entrar",
+      "登录",
+      "Accedi",
+      "送信",
+      "Senden",
+      "Войти"
+    ],
+    "connect_keyboard": [
+      "Conecte o teclado",
+      "Connect keyboard",
+      "Conecte el teclado",
+      "请连接键盘",
+      "Collega tastiera",
+      "キーボードを接続",
+      "Tastatur verbinden",
+      "Подключите клавиатуру"
+    ],
+    "typing": [
+      "Digitando...",
+      "Typing...",
+      "Escribiendo...",
+      "正在输入...",
+      "Digitazione...",
+      "入力中...",
+      "Eingabe...",
+      "Ввод..."
+    ],
+    "type_done": [
+      "Envio finalizado",
+      "Typing complete",
+      "Envío completado",
+      "输入完成",
+      "Invio completato",
+      "入力完了",
+      "Eingabe beendet",
+      "Ввод завершён"
+    ],
+    "keyboard_lost": [
+      "Teclado desconectado",
+      "Keyboard disconnected",
+      "Teclado desconectado",
+      "键盘已断开",
+      "Tastiera scollegata",
+      "キーボード切断",
+      "Tastatur getrennt",
+      "Клавиатура отключена"
+    ],
+    "digits": [
+      "Digite %d dígitos",
+      "Enter %d digits",
+      "Ingrese %d dígitos",
+      "请输入%d位数字",
+      "Inserisci %d cifre",
+      "%d桁を入力",
+      "%d Ziffern eingeben",
+      "Введите %d цифр"
+    ],
+    "locked": [
+      "BLOQUEADO",
+      "LOCKED",
+      "BLOQUEADO",
+      "已锁定",
+      "BLOCCATO",
+      "ロック中",
+      "GESPERRT",
+      "ЗАБЛОКИРОВАНО"
+    ],
+    "wait": [
+      "Aguarde %lus",
+      "Wait %lus",
+      "Espere %lus",
+      "请等待%lu秒",
+      "Attendi %lus",
+      "%lu秒待機",
+      "%lus warten",
+      "Подождите %luс"
+    ],
+    "wipe_after": [
+      "Apaga após %d erros",
+      "Wipes after %d errors",
+      "Borra tras %d errores",
+      "再错%d次将清空",
+      "Cancella dopo %d errori",
+      "あと%d回で消去",
+      "Löscht nach %d Fehlern",
+      "Сотрёт после %d ошибок"
+    ],
+    "vault": [
+      "COFRE",
+      "VAULT",
+      "BÓVEDA",
+      "保险库",
+      "CASSAFORTE",
+      "保管庫",
+      "TRESOR",
+      "ХРАНИЛИЩЕ"
+    ],
+    "wiped": [
+      "APAGADO",
+      "WIPED",
+      "BORRADA",
+      "已清空",
+      "CANCELLATA",
+      "消去済み",
+      "GELÖSCHT",
+      "ОЧИЩЕНО"
+    ],
+    "confirm_pin": [
+      "Confirme PIN",
+      "Confirm PIN",
+      "Confirme PIN",
+      "确认PIN",
+      "Conferma PIN",
+      "PINを確認",
+      "PIN bestätigen",
+      "Повторите PIN"
+    ],
+    "create_pin": [
+      "Criar PIN",
+      "Create PIN",
+      "Crear PIN",
+      "创建PIN",
+      "Crea PIN",
+      "PINを作成",
+      "PIN erstellen",
+      "Создайте PIN"
+    ],
+    "new_pin": [
+      "Novo PIN",
+      "New PIN",
+      "Nuevo PIN",
+      "新PIN",
+      "Nuovo PIN",
+      "新しいPIN",
+      "Neue PIN",
+      "Новый PIN"
+    ],
+    "current_pin": [
+      "PIN atual",
+      "Current PIN",
+      "PIN actual",
+      "当前PIN",
+      "PIN attuale",
+      "現在のPIN",
+      "Aktuelle PIN",
+      "Текущий PIN"
+    ],
+    "enter_pin": [
+      "Digite PIN",
+      "Enter PIN",
+      "Ingrese PIN",
+      "输入PIN",
+      "Inserisci PIN",
+      "PINを入力",
+      "PIN eingeben",
+      "Введите PIN"
+    ],
+    "pin_mismatch": [
+      "PINs diferentes!",
+      "PINs do not match!",
+      "¡PIN distintos!",
+      "PIN不一致！",
+      "PIN diversi!",
+      "PINが一致しません",
+      "PINs verschieden!",
+      "PIN не совпадают!"
+    ],
+    "generating_key": [
+      "Gerando chave...",
+      "Generating key...",
+      "Generando clave...",
+      "正在生成密钥...",
+      "Generazione chiave...",
+      "鍵を生成中...",
+      "Schlüssel erzeugen...",
+      "Создание ключа..."
+    ],
+    "saving_pin": [
+      "Salvando PIN...",
+      "Saving PIN...",
+      "Guardando PIN...",
+      "正在保存PIN...",
+      "Salvataggio PIN...",
+      "PINを保存中...",
+      "PIN speichern...",
+      "Сохранение PIN..."
+    ],
+    "pin_changed": [
+      "PIN alterado!",
+      "PIN changed!",
+      "¡PIN cambiado!",
+      "PIN已更改！",
+      "PIN modificato!",
+      "PINを変更しました",
+      "PIN geändert!",
+      "PIN изменён!"
+    ],
+    "verifying": [
+      "Verificando...",
+      "Verifying...",
+      "Verificando...",
+      "正在验证...",
+      "Verifica...",
+      "確認中...",
+      "Prüfen...",
+      "Проверка..."
+    ],
+    "wrong_pin": [
+      "PIN errado (%d/%d)",
+      "Wrong PIN (%d/%d)",
+      "PIN incorrecto (%d/%d)",
+      "PIN错误（%d/%d）",
+      "PIN errato (%d/%d)",
+      "PINが違います（%d/%d）",
+      "Falsche PIN (%d/%d)",
+      "Неверный PIN (%d/%d)"
+    ],
+    "autolock_seconds": [
+      "Bloqueio: %lu s",
+      "Auto-lock: %lu s",
+      "Bloqueo: %lu s",
+      "自动锁定：%lu秒",
+      "Blocco: %lu s",
+      "自動ロック：%lu秒",
+      "Sperre: %lu s",
+      "Блокировка: %lu с"
+    ],
+    "autolock_minutes": [
+      "Bloqueio: %lu min",
+      "Auto-lock: %lu min",
+      "Bloqueo: %lu min",
+      "自动锁定：%lu分钟",
+      "Blocco: %lu min",
+      "自動ロック：%lu分",
+      "Sperre: %lu min",
+      "Блокировка: %lu мин"
+    ],
+    "tap_change": [
+      "Pressione para mudar",
+      "Tap to change",
+      "Pulse para cambiar",
+      "点击更改",
+      "Tocca per cambiare",
+      "タップして変更",
+      "Zum Ändern tippen",
+      "Нажмите для смены"
+    ],
+    "wifi_on": [
+      "Ativar WiFi",
+      "Start WiFi",
+      "Activar WiFi",
+      "开启WiFi",
+      "Attiva WiFi",
+      "WiFi開始",
+      "WiFi starten",
+      "Включить WiFi"
+    ],
+    "wifi_active": [
+      "WiFi ativo",
+      "WiFi active",
+      "WiFi activo",
+      "WiFi已开启",
+      "WiFi attivo",
+      "WiFi有効",
+      "WiFi aktiv",
+      "WiFi включён"
+    ],
+    "wifi_off": [
+      "Desligar WiFi",
+      "Stop WiFi",
+      "Apagar WiFi",
+      "关闭WiFi",
+      "Disattiva WiFi",
+      "WiFi停止",
+      "WiFi stoppen",
+      "Выключить WiFi"
+    ],
+    "themes": [
+      "Temas",
+      "Themes",
+      "Temas",
+      "主题",
+      "Temi",
+      "テーマ",
+      "Designs",
+      "Темы"
+    ],
+    "blue": [
+      "Azul",
+      "Blue",
+      "Azul",
+      "蓝色",
+      "Blu",
+      "青",
+      "Blau",
+      "Синяя"
+    ],
+    "purple": [
+      "Roxo",
+      "Purple",
+      "Morado",
+      "紫色",
+      "Viola",
+      "紫",
+      "Violett",
+      "Фиолетовая"
+    ],
+    "amber": [
+      "Âmbar",
+      "Amber",
+      "Ámbar",
+      "琥珀色",
+      "Ambra",
+      "琥珀",
+      "Bernstein",
+      "Янтарная"
+    ],
+    "theme_saved": [
+      "Tema salvo",
+      "Theme saved",
+      "Tema guardado",
+      "主题已保存",
+      "Tema salvato",
+      "テーマを保存",
+      "Design gespeichert",
+      "Тема сохранена"
+    ],
+    "change_pin": [
+      "Alterar PIN",
+      "Change PIN",
+      "Cambiar PIN",
+      "更改PIN",
+      "Cambia PIN",
+      "PIN変更",
+      "PIN ändern",
+      "Сменить PIN"
+    ],
+    "brightness": [
+      "Brilho",
+      "Brightness",
+      "Brillo",
+      "亮度",
+      "Luminosità",
+      "明るさ",
+      "Helligkeit",
+      "Яркость"
+    ],
+    "brightness_saved": [
+      "Brilho salvo",
+      "Brightness saved",
+      "Brillo guardado",
+      "亮度已保存",
+      "Luminosità salvata",
+      "明るさを保存",
+      "Helligkeit gespeichert",
+      "Яркость сохранена"
+    ],
+    "storage_error": [
+      "Falha no armazenamento",
+      "Storage failed",
+      "Error de almacenamiento",
+      "存储失败",
+      "Errore memoria",
+      "ストレージエラー",
+      "Speicherfehler",
+      "Ошибка хранилища"
+    ],
+    "restart": [
+      "Reinicie o aparelho",
+      "Restart device",
+      "Reinicie el dispositivo",
+      "请重启设备",
+      "Riavvia dispositivo",
+      "再起動してください",
+      "Gerät neu starten",
+      "Перезапустите устройство"
+    ],
+    "edit": [
+      "Editar",
+      "Edit",
+      "Editar",
+      "编辑",
+      "Modifica",
+      "編集",
+      "Bearbeiten",
+      "Изменить"
+    ],
+    "delete": [
+      "Excluir",
+      "Delete",
+      "Eliminar",
+      "删除",
+      "Elimina",
+      "削除",
+      "Löschen",
+      "Удалить"
+    ],
+    "delete_confirm": [
+      "Excluir?",
+      "Delete?",
+      "¿Eliminar?",
+      "确定删除？",
+      "Eliminare?",
+      "削除しますか？",
+      "Löschen?",
+      "Удалить?"
+    ],
+    "deleted": [
+      "Excluído",
+      "Deleted",
+      "Eliminado",
+      "已删除",
+      "Eliminato",
+      "削除しました",
+      "Gelöscht",
+      "Удалено"
+    ],
+    "name_hint": [
+      "Nome (ex: Gmail)",
+      "Name (e.g. Gmail)",
+      "Nombre (ej: Gmail)",
+      "名称（如Gmail）",
+      "Nome (es: Gmail)",
+      "名前（例：Gmail）",
+      "Name (z.B. Gmail)",
+      "Название (например Gmail)"
+    ],
+    "user_hint": [
+      "Usuário / Email",
+      "Username / Email",
+      "Usuario / Correo",
+      "用户名 / 邮箱",
+      "Utente / Email",
+      "ユーザー名 / メール",
+      "Benutzer / E-Mail",
+      "Пользователь / Почта"
+    ],
+    "generate": [
+      "Gerar",
+      "Generate",
+      "Generar",
+      "生成",
+      "Genera",
+      "生成",
+      "Erzeugen",
+      "Создать"
+    ],
+    "length": [
+      "Tamanho",
+      "Length",
+      "Longitud",
+      "长度",
+      "Lunghezza",
+      "長さ",
+      "Länge",
+      "Длина"
+    ],
+    "symbols": [
+      "Símbolos",
+      "Symbols",
+      "Símbolos",
+      "符号",
+      "Simboli",
+      "記号",
+      "Symbole",
+      "Символы"
+    ],
+    "new_credential": [
+      "+ Nova Credencial",
+      "+ New Credential",
+      "+ Nueva Credencial",
+      "+ 新建凭据",
+      "+ Nuova Credenziale",
+      "+ 認証情報を追加",
+      "+ Neue Zugangsdaten",
+      "+ Новая запись"
+    ],
+    "fill_all": [
+      "Preencha todos os campos",
+      "Fill all fields",
+      "Complete todos los campos",
+      "请填写所有字段",
+      "Compila tutti i campi",
+      "すべて入力してください",
+      "Alle Felder ausfüllen",
+      "Заполните все поля"
+    ],
+    "backup_hint": [
+      "Senha do backup (mín. 8)",
+      "Backup password (min. 8)",
+      "Contraseña de copia (mín. 8)",
+      "备份密码（至少8位）",
+      "Password backup (min. 8)",
+      "バックアップパスワード（8文字以上）",
+      "Backup-Passwort (min. 8)",
+      "Пароль копии (мин. 8)"
+    ],
+    "backup_short": [
+      "Senha do backup: mínimo 8 caracteres",
+      "Backup password: at least 8 characters",
+      "Contraseña de copia: mínimo 8 caracteres",
+      "备份密码至少需要8个字符",
+      "Password backup: minimo 8 caratteri",
+      "バックアップパスワードは8文字以上",
+      "Backup-Passwort: mindestens 8 Zeichen",
+      "Пароль копии: минимум 8 символов"
+    ],
+    "export": [
+      "Exportar",
+      "Export",
+      "Exportar",
+      "导出",
+      "Esporta",
+      "エクスポート",
+      "Exportieren",
+      "Экспорт"
+    ],
+    "import": [
+      "Importar",
+      "Import",
+      "Importar",
+      "导入",
+      "Importa",
+      "インポート",
+      "Importieren",
+      "Импорт"
+    ],
+    "generating": [
+      "Gerando...",
+      "Generating...",
+      "Generando...",
+      "正在生成...",
+      "Generazione...",
+      "生成中...",
+      "Erzeugen...",
+      "Создание..."
+    ],
+    "export_done": [
+      "Backup exportado",
+      "Backup exported",
+      "Copia exportada",
+      "备份已导出",
+      "Backup esportato",
+      "バックアップを保存しました",
+      "Backup exportiert",
+      "Копия экспортирована"
+    ],
+    "export_error": [
+      "Erro ao exportar",
+      "Export failed",
+      "Error al exportar",
+      "导出失败",
+      "Errore esportazione",
+      "エクスポート失敗",
+      "Export fehlgeschlagen",
+      "Ошибка экспорта"
+    ],
+    "importing": [
+      "Importando...",
+      "Importing...",
+      "Importando...",
+      "正在导入...",
+      "Importazione...",
+      "インポート中...",
+      "Importieren...",
+      "Импорт..."
+    ],
+    "import_result": [
+      "{added} importada(s), {skipped} ignorada(s)",
+      "{added} imported, {skipped} skipped",
+      "{added} importada(s), {skipped} omitida(s)",
+      "已导入{added}项，已跳过{skipped}项",
+      "{added} importate, {skipped} ignorate",
+      "{added}件を追加、{skipped}件をスキップ",
+      "{added} importiert, {skipped} übersprungen",
+      "Импортировано: {added}, пропущено: {skipped}"
+    ],
+    "backup_wrong": [
+      "Senha do backup incorreta",
+      "Wrong backup password",
+      "Contraseña de copia incorrecta",
+      "备份密码错误",
+      "Password backup errata",
+      "バックアップパスワードが違います",
+      "Falsches Backup-Passwort",
+      "Неверный пароль копии"
+    ],
+    "invalid_file": [
+      "Arquivo inválido",
+      "Invalid file",
+      "Archivo no válido",
+      "文件无效",
+      "File non valido",
+      "無効なファイル",
+      "Ungültige Datei",
+      "Неверный файл"
+    ]
+  }
+}

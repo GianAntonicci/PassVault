@@ -8,14 +8,21 @@
 #include <mbedtls/md.h>
 #include <mbedtls/platform_util.h>
 #include "config.h"
+#include "localization.h"
 
 // ---- Credential struct ----
+enum CredentialCategory : uint8_t {
+  CATEGORY_NONE, CATEGORY_SOCIAL, CATEGORY_EMAIL, CATEGORY_BANK, CATEGORY_WORK, CATEGORY_COUNT
+};
+const char* const CATEGORY_LABELS[] = { "Sem tipo", "Redes Sociais", "Email", "Banco", "Trabalho" };
+
 struct Credential {
   char name[33];
   char user[65];
   char pass[65];
   bool favorite;
   uint32_t useCount;
+  uint8_t category;
 };
 
 // ---- Globals ----
@@ -28,9 +35,9 @@ unsigned long autoLockMs = AUTOLOCK_MS;
 uint8_t displayBrightness = BRIGHTNESS_DEFAULT;
 bool storageReady = false;
 
-enum CredentialSort : uint8_t { SORT_ALPHA, SORT_RECENT, SORT_USED, SORT_COUNT };
+enum CredentialSort : uint8_t { SORT_ALPHA, SORT_RECENT, SORT_USED, SORT_CATEGORY, SORT_COUNT };
 uint8_t credentialSort = SORT_ALPHA;
-const char* const SORT_LABELS[] = { "Alfabetica", "Mais recente", "Mais usada" };
+const char* const SORT_LABELS[] = { "Alfabetica", "Mais recente", "Mais usada", "Por tipo" };
 
 bool setCredentialSort(uint8_t mode) {
   if (mode >= SORT_COUNT) return false;
@@ -76,6 +83,15 @@ bool setBrightness(uint8_t percent) {
   if (percent == displayBrightness) return true;
   if (prefs.putUChar("brightness", percent) != sizeof(uint8_t)) return false;
   displayBrightness = percent;
+  return true;
+}
+
+// O idioma e compartilhado pela tela e web; nao integra backups de credenciais.
+bool setLanguage(uint8_t language) {
+  if (language >= LANGUAGE_COUNT) return false;
+  if (language == activeLanguage) return true;
+  if (prefs.putUChar("language", language) != sizeof(uint8_t)) return false;
+  activeLanguage = language;
   return true;
 }
 
@@ -236,6 +252,7 @@ bool ctEqual(const uint8_t* a, const uint8_t* b, size_t n) {
 //             plen (tamanho do PIN), fails (tentativas erradas),
 //             cnt, c0..cN (credenciais cifradas), m0..mN (temporarias da migracao)
 //             f0..fN (favoritas; ausente = false), u0..uN (usos; ausente = 0),
+//             t0..tN (tipo; ausente/invalido = Sem tipo),
 //             sort (ordenacao; ausente = alfabetica),
 //             salt + pin (formato v1, so em vaults antigos)
 
@@ -341,6 +358,11 @@ PinChangeResult changePin(const char* pin) {
   return finishPinChange() ? PIN_CHANGE_OK : PIN_CHANGE_PENDING;
 }
 
+void loadLanguagePreference() {
+  uint8_t language = prefs.getUChar("language", 0);
+  activeLanguage = language < LANGUAGE_COUNT ? language : 0;
+}
+
 bool storageBegin() {
   storageReady = false;
   if (!prefs.begin("pv", false) || !finishPinChange()) return false;
@@ -354,6 +376,7 @@ bool storageBegin() {
                         ? brightness : BRIGHTNESS_DEFAULT;
   uint8_t mode = prefs.getUChar("sort", SORT_ALPHA);
   credentialSort = mode < SORT_COUNT ? mode : uint8_t(SORT_ALPHA);
+  loadLanguagePreference();
   storageReady = true;
   return true;
 }
@@ -466,6 +489,8 @@ void saveSingleCred(int idx) {
   prefs.putBool(key, creds[idx].favorite);
   sprintf(key, "u%d", idx);
   prefs.putUInt(key, creds[idx].useCount);
+  sprintf(key, "t%d", idx);
+  prefs.putUChar(key, creds[idx].category);
 }
 
 void loadCredentials() {
@@ -476,6 +501,9 @@ void loadCredentials() {
     creds[i].favorite = prefs.getBool(key, false);
     sprintf(key, "u%d", i);
     creds[i].useCount = prefs.getUInt(key, 0);
+    sprintf(key, "t%d", i);
+    uint8_t category = prefs.getUChar(key, CATEGORY_NONE);
+    creds[i].category = category < CATEGORY_COUNT ? category : uint8_t(CATEGORY_NONE);
     sprintf(key, "c%d", i);
     String enc = prefs.getString(key, "");
     if (enc.length() == 0) continue;
@@ -493,8 +521,17 @@ void loadCredentials() {
   }
 }
 
-bool addCredential(const char* name, const char* user, const char* pass, bool favorite = false) {
-  if (credCount >= MAX_CREDS) return false;
+bool setCredentialCategory(int idx, uint8_t category) {
+  if (idx < 0 || idx >= MAX_CREDS || category >= CATEGORY_COUNT) return false;
+  char key[4]; snprintf(key, sizeof(key), "t%d", idx);
+  if (prefs.putUChar(key, category) != sizeof(uint8_t)) return false;
+  creds[idx].category = category;
+  return true;
+}
+
+bool addCredential(const char* name, const char* user, const char* pass, bool favorite = false,
+                   uint8_t category = CATEGORY_NONE) {
+  if (credCount >= MAX_CREDS || !setCredentialCategory(credCount, category)) return false;
   strncpy(creds[credCount].name, name, 32); creds[credCount].name[32] = 0;
   strncpy(creds[credCount].user, user, 64); creds[credCount].user[64] = 0;
   strncpy(creds[credCount].pass, pass, 64); creds[credCount].pass[64] = 0;
@@ -506,8 +543,11 @@ bool addCredential(const char* name, const char* user, const char* pass, bool fa
   return true;
 }
 
-bool updateCredential(int idx, const char* name, const char* user, const char* pass) {
+// O sentinela preserva o tipo para clientes antigos que nao enviam esse campo.
+bool updateCredential(int idx, const char* name, const char* user, const char* pass,
+                      uint8_t category = CATEGORY_COUNT) {
   if (idx < 0 || idx >= credCount) return false;
+  if (category != CATEGORY_COUNT && !setCredentialCategory(idx, category)) return false;
   strncpy(creds[idx].name, name, 32); creds[idx].name[32] = 0;
   strncpy(creds[idx].user, user, 64); creds[idx].user[64] = 0;
   strncpy(creds[idx].pass, pass, 64); creds[idx].pass[64] = 0;
@@ -526,9 +566,15 @@ bool setCredentialFavorite(int idx, bool favorite) {
 }
 
 // Ordenacao apenas para exibicao: IDs de armazenamento continuam estaveis.
-// Favoritas primeiro em todos os modos. O indice preserva a ordem de cadastro,
+// No modo Por tipo, favoritas primeiro dentro de cada grupo; Sem tipo por ultimo.
+// Nos demais modos, favoritas primeiro. O indice preserva a ordem de cadastro,
 // inclusive apos exclusoes; editar nao transforma uma conta em cadastro recente.
 bool credentialComesBefore(int a, int b) {
+  if (credentialSort == SORT_CATEGORY && creds[a].category != creds[b].category) {
+    int ca = creds[a].category ? creds[a].category : CATEGORY_COUNT;
+    int cb = creds[b].category ? creds[b].category : CATEGORY_COUNT;
+    return ca < cb;
+  }
   if (creds[a].favorite != creds[b].favorite) return creds[a].favorite;
   if (credentialSort == SORT_RECENT) return a > b;
   if (credentialSort == SORT_USED && creds[a].useCount != creds[b].useCount)
@@ -565,6 +611,8 @@ bool deleteCredential(int idx) {
   prefs.remove(key);
   sprintf(key, "u%d", credCount);
   prefs.remove(key);
+  sprintf(key, "t%d", credCount);
+  prefs.remove(key);
   mbedtls_platform_zeroize(&creds[credCount], sizeof(Credential));
   return true;
 }
@@ -574,8 +622,9 @@ bool deleteCredential(int idx) {
 //   bmaster = PBKDF2-HMAC-SHA256(senha do backup, bsalt, iter)
 //   chave = SHA-256(bmaster||"bkey"), verificador = SHA-256(bmaster||"bver"),
 //   chave do MAC = SHA-256(bmaster||"bmac"); MAC = HMAC(salt + "," + c0 + "," + c1 ...)
-// v2 inclui "2," antes do salt no MAC para autenticar a versao.
-// v1: "name|user|pass"; v2: "favorite|name|user|pass" -> AES-256-CBC (IV aleatorio) -> hex
+// v2/v3 incluem a versao antes do salt no MAC para autentica-la.
+// v1: name|user|pass; v2: favorite|name|user|pass; v3: category|favorite|name|user|pass
+// -> AES-256-CBC (IV aleatorio) -> hex
 
 #define BACKUP_ITERS_MIN  1000
 #define BACKUP_ITERS_MAX  200000
@@ -632,14 +681,14 @@ String exportBackup(const char* pw) {
 
   static String entries[MAX_CREDS];
   for (int i = 0; i < credCount; i++) {
-    String plain = String(creds[i].favorite ? "1|" : "0|") + creds[i].name +
+    String plain = String(creds[i].category) + "|" + (creds[i].favorite ? "1|" : "0|") + creds[i].name +
                    "|" + creds[i].user + "|" + creds[i].pass;
     entries[i] = encryptData(plain.c_str(), key);
     mbedtls_platform_zeroize((void*)plain.c_str(), plain.length());
   }
-  backupMac(macKey, String("2,") + saltHex, entries, credCount, mac);
+  backupMac(macKey, String("3,") + saltHex, entries, credCount, mac);
 
-  String json = "{\"app\":\"PassVault\",\"v\":2,\"iter\":" + String(KDF_ITERS) +
+  String json = "{\"app\":\"PassVault\",\"v\":3,\"iter\":" + String(KDF_ITERS) +
                 ",\"salt\":\"" + saltHex + "\",\"ver\":\"" + bytesToHex(ver, 32) +
                 "\",\"mac\":\"" + bytesToHex(mac, 32) + "\",\"creds\":[";
   for (int i = 0; i < credCount; i++) {
@@ -659,20 +708,33 @@ int importBackup(const char* pw, int iters, const String& saltHex, const String&
                  const String& macHex, const String* entries, int n, int* skipped, int version = 1) {
   uint8_t bsalt[16], fver[32], fmac[32], key[32], ver[32], macKey[32], mac[32];
   *skipped = 0;
-  if ((version != 1 && version != 2) || iters < BACKUP_ITERS_MIN || iters > BACKUP_ITERS_MAX || n < 0 ||
+  if ((version < 1 || version > 3) || iters < BACKUP_ITERS_MIN || iters > BACKUP_ITERS_MAX || n < 0 || n > MAX_CREDS ||
       !hexToBytes(saltHex, bsalt, 16) || !hexToBytes(verHex, fver, 32) ||
       !hexToBytes(macHex, fmac, 32)) return -2;
 
   deriveBackupKeys(pw, bsalt, iters, key, ver, macKey);
   int result = 0;
   if (!ctEqual(ver, fver, 32)) { result = -1; goto done; }
-  backupMac(macKey, version == 2 ? String("2,") + saltHex : saltHex, entries, n, mac);
+  backupMac(macKey, version >= 2 ? String(version) + "," + saltHex : saltHex, entries, n, mac);
   if (!ctEqual(mac, fmac, 32)) { result = -2; goto done; }
 
   for (int i = 0; i < n; i++) {
     String plain = decryptData(entries[i], key);
     bool favorite = false;
-    if (version == 2) {
+    uint8_t category = CATEGORY_NONE;
+    if (version == 3) {
+      if (plain.length() < 2 || plain[0] < '0' || plain[0] >= '0' + CATEGORY_COUNT || plain[1] != '|') {
+        mbedtls_platform_zeroize((void*)plain.c_str(), plain.length());
+        (*skipped)++;
+        continue;
+      }
+      category = plain[0] - '0';
+      String payload = plain.substring(2);
+      mbedtls_platform_zeroize((void*)plain.c_str(), plain.length());
+      plain = payload;
+      mbedtls_platform_zeroize((void*)payload.c_str(), payload.length());
+    }
+    if (version >= 2) {
       if (!plain.startsWith("0|") && !plain.startsWith("1|")) {
         mbedtls_platform_zeroize((void*)plain.c_str(), plain.length());
         (*skipped)++;
@@ -692,7 +754,7 @@ int importBackup(const char* pw, int iters, const String& saltHex, const String&
       bool dup = false;
       for (int j = 0; j < credCount && !dup; j++)
         dup = name == creds[j].name && user == creds[j].user;
-      if (dup || !addCredential(name.c_str(), user.c_str(), pass.c_str(), favorite)) (*skipped)++;
+      if (dup || !addCredential(name.c_str(), user.c_str(), pass.c_str(), favorite, category)) (*skipped)++;
       else result++;
       mbedtls_platform_zeroize((void*)pass.c_str(), pass.length());
     } else {

@@ -10,8 +10,8 @@ using namespace fs;
 // ---- extern from vault_core.h ----
 extern Credential creds[];
 extern int        credCount;
-extern bool addCredential(const char*, const char*, const char*, bool);
-extern bool updateCredential(int, const char*, const char*, const char*);
+extern bool addCredential(const char*, const char*, const char*, bool, uint8_t);
+extern bool updateCredential(int, const char*, const char*, const char*, uint8_t);
 extern bool deleteCredential(int);
 
 WebServer server(80);
@@ -59,9 +59,12 @@ h1{text-align:center;color:#0ff;margin-bottom:18px;font-size:1.5em}
       margin-bottom:10px;cursor:pointer;transition:background .2s}
 .card:hover{background:#16213e}
 .card .name{font-weight:bold;color:#0f0;font-size:1.1em}
+.type{font-size:.8em;margin-top:5px;color:var(--type-color)}
+.group{margin:16px 0 8px;font-size:1em;color:#eee}
 .card .user{color:#aaa;font-size:.85em;margin-top:2px}
 #form-area{display:none;background:#1a1a2e;border:1px solid #333;
            border-radius:10px;padding:16px;margin-bottom:14px}
+select{width:100%;padding:10px;margin:6px 0;background:#222;color:#eee;border:1px solid #444;border-radius:6px;font-size:1em}
 input{width:100%;padding:10px;margin:6px 0;border:1px solid #444;
       border-radius:6px;background:#222;color:#eee;font-size:1em}
 input:focus{outline:none;border-color:#0ff}
@@ -99,65 +102,117 @@ input:focus{outline:none;border-color:#0ff}
 <body>
 <h1>&#128274; PassVault</h1>
 <div id="msg"></div>
+<label for="language" data-i18n="language">Idioma</label>
+<select id="language" onchange="saveLanguage()"></select>
 <div id="detail" class="detail-area">
-  <div class="field"><div class="label">Nome</div><div class="value" id="d-name"></div></div>
-  <div class="field"><div class="label">Usu&aacute;rio</div><div class="value" id="d-user"></div></div>
-  <div class="field"><div class="label">Senha</div><div class="value" id="d-pass"></div></div>
+  <div class="field"><div class="label" data-i18n="name">Nome</div><div class="value" id="d-name"></div></div>
+  <div class="field"><div class="label" data-i18n="type">Tipo</div><div class="value" id="d-category"></div></div>
+  <div class="field"><div class="label" data-i18n="user">Usu&aacute;rio</div><div class="value" id="d-user"></div></div>
+  <div class="field"><div class="label" data-i18n="password">Senha</div><div class="value" id="d-pass"></div></div>
   <div style="margin-top:12px;text-align:center">
-    <button id="d-favorite" class="btn btn-cancel" onclick="favoriteCred()">Favoritar</button>
-    <button class="btn btn-ok" onclick="editCred()">Editar</button>
-    <button class="btn btn-del" onclick="delCred()">Excluir</button>
-    <button class="btn btn-cancel" onclick="closeDetail()">Voltar</button>
+    <button id="d-favorite" class="btn btn-cancel" onclick="favoriteCred()" data-i18n="favorite">Favoritar</button>
+    <button class="btn btn-ok" onclick="editCred()" data-i18n="edit">Editar</button>
+    <button class="btn btn-del" onclick="delCred()" data-i18n="delete">Excluir</button>
+    <button class="btn btn-cancel" onclick="closeDetail()" data-i18n="back">Voltar</button>
   </div>
 </div>
 <div id="form-area">
-  <input id="f-name" placeholder="Nome (ex: Gmail)" maxlength="32">
-  <input id="f-user" placeholder="Usu&aacute;rio / Email" maxlength="64">
+  <input id="f-name" data-i18n-placeholder="name_hint" placeholder="Nome (ex: Gmail)" maxlength="32">
+  <input id="f-user" data-i18n-placeholder="user_hint" placeholder="Usu&aacute;rio / Email" maxlength="64">
   <div class="pass-row">
-    <input id="f-pass" placeholder="Senha" maxlength="64">
-    <button class="btn btn-gen" onclick="genPass()">Gerar</button>
+    <input id="f-pass" data-i18n-placeholder="password" placeholder="Senha" maxlength="64">
+    <button class="btn btn-gen" onclick="genPass()" data-i18n="generate">Gerar</button>
   </div>
   <div class="gen-opts">
-    <label>Tamanho<input type="number" id="g-len" min="4" max="64" value="16"></label>
+    <label><span data-i18n="length">Tamanho</span><input type="number" id="g-len" min="4" max="64" value="16"></label>
     <label><input type="checkbox" id="g-up" checked>A-Z</label>
     <label><input type="checkbox" id="g-num" checked>0-9</label>
-    <label><input type="checkbox" id="g-sym" checked>S&iacute;mbolos</label>
+    <label><input type="checkbox" id="g-sym" checked><span data-i18n="symbols">S&iacute;mbolos</span></label>
   </div>
+  <label for="f-category" data-i18n="type">Tipo</label>
+  <select id="f-category">
+    <option value="0" data-i18n="cat_none">Sem tipo</option>
+    <option value="1" data-i18n="cat_social">Redes Sociais</option>
+    <option value="2" data-i18n="cat_email">Email</option>
+    <option value="3" data-i18n="cat_bank">Banco</option>
+    <option value="4" data-i18n="cat_work">Trabalho</option>
+  </select>
   <input type="hidden" id="f-id" value="-1">
   <div style="text-align:center;margin-top:8px">
-    <button class="btn btn-ok" onclick="saveCred()">Salvar</button>
-    <button class="btn btn-cancel" onclick="closeForm()">Cancelar</button>
+    <button class="btn btn-ok" onclick="saveCred()" data-i18n="save">Salvar</button>
+    <button class="btn btn-cancel" onclick="closeForm()" data-i18n="cancel">Cancelar</button>
   </div>
 </div>
-<label for="sort">Ordenar por</label>
+<label for="sort" data-i18n="sort_by">Ordenar por</label>
 <select id="sort" onchange="saveSort()" style="width:100%;padding:10px;margin:8px 0;background:#222;color:#eee;border:1px solid #555;border-radius:6px">
-  <option value="0">Alfab&eacute;tica</option>
-  <option value="1">Mais recente</option>
-  <option value="2">Mais usada</option>
+  <option value="0" data-i18n="sort_alpha">Alfab&eacute;tica</option>
+  <option value="1" data-i18n="sort_recent">Mais recente</option>
+  <option value="2" data-i18n="sort_used">Mais usada</option>
+  <option value="3" data-i18n="sort_type">Por tipo</option>
 </select>
 <div id="list"></div>
-<button class="btn-add" onclick="openAdd()">+ Nova Credencial</button>
+<button class="btn-add" onclick="openAdd()" data-i18n="new_credential">+ Nova Credencial</button>
 <div class="backup">
-  <input type="password" id="b-pw" placeholder="Senha do backup (m&iacute;n. 8)" maxlength="64">
+  <input type="password" id="b-pw" data-i18n-placeholder="backup_hint" placeholder="Senha do backup (m&iacute;n. 8)" maxlength="64">
   <div style="text-align:center">
-    <button class="btn btn-cancel" onclick="doExport()">Exportar</button>
-    <button class="btn btn-cancel" onclick="document.getElementById('b-file').click()">Importar</button>
+    <button class="btn btn-cancel" onclick="doExport()" data-i18n="export">Exportar</button>
+    <button class="btn btn-cancel" onclick="document.getElementById('b-file').click()" data-i18n="import">Importar</button>
   </div>
   <input type="file" id="b-file" accept=".json,application/json" style="display:none" onchange="doImport(this)">
 </div>
 <script>
-let selId=-1,selFavorite=false;
+let ui={strings:{load_error:'Erro ao carregar',language_error:'Erro ao salvar idioma'}};
+let currentLanguage=0;
+function tr(key){return ui.strings[key]||key}
+function applyLanguage(data){
+  ui=data;currentLanguage=data.language;
+  document.documentElement.lang=data.code;
+  const select=document.getElementById('language');
+  select.replaceChildren();
+  data.languages.forEach((language,id)=>{
+    const option=document.createElement('option');option.value=String(id);option.textContent=language.name;
+    select.appendChild(option);
+  });
+  select.value=String(currentLanguage);
+  document.querySelectorAll('[data-i18n]').forEach(e=>e.textContent=tr(e.dataset.i18n));
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(e=>e.placeholder=tr(e.dataset.i18nPlaceholder));
+  if(selId>=0){
+    document.getElementById('d-category').textContent=tr(typeKeys[selCategory]);
+    document.getElementById('d-favorite').textContent=tr(selFavorite?'unfavorite_long':'favorite');
+  }
+}
+function loadLanguage(){
+  return fetch('/api/language').then(r=>{if(!r.ok)throw 0;return r.json()}).then(applyLanguage);
+}
+function saveLanguage(){
+  const select=document.getElementById('language');select.disabled=true;
+  return fetch('/api/language',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
+    body:'language='+select.value}).then(r=>{if(!r.ok)throw 0;return r.json()}).then(data=>{
+      applyLanguage(data);msg(tr('language_saved'),true);load();
+    }).catch(()=>{select.value=String(currentLanguage);msg(tr('language_error'),false)})
+    .finally(()=>{select.disabled=false});
+}
+
+let selId=-1,selFavorite=false,selCategory=0;
+const typeKeys=['cat_none','cat_social','cat_email','cat_bank','cat_work'];
+const typeColors=['#bdbdbd','#c080ff','#00ffff','#00ff00','#ffff00'];
 function msg(t,ok){const m=document.getElementById('msg');m.textContent=t;
   m.className=ok?'ok-msg':'err-msg';m.style.display='block';
   setTimeout(()=>m.style.display='none',2500)}
 function load(){
   fetch('/api/list').then(r=>r.json()).then(d=>{
-    let h='';d.forEach(c=>{
-      h+='<div class="card" onclick="showDetail('+c.id+')"><div class="name">'+
-        (c.favorite?'&#9733; ':'')+esc(c.name)+'</div><div class="user">'+esc(c.user)+'</div></div>';
+    let h='',previous=-1;d.forEach(c=>{
+      const type=Number.isInteger(c.category)&&c.category>=0&&c.category<typeKeys.length?c.category:0;
+      if(document.getElementById('sort').value==='3'&&previous!==type){
+        h+='<h2 class="group">'+tr(typeKeys[type])+'</h2>';previous=type;
+      }
+      h+='<div class="card" style="border-left:4px solid '+typeColors[type]+
+        ';--type-color:'+typeColors[type]+'" onclick="showDetail('+c.id+')"><div class="name">'+
+        (c.favorite?'&#9733; ':'')+esc(c.name)+'</div><div class="user">'+esc(c.user)+
+        '</div><div class="type">'+tr(typeKeys[type])+'</div></div>';
     });
-    document.getElementById('list').innerHTML=h||'<p style="text-align:center;color:#666">Nenhuma credencial</p>';
-  }).catch(()=>msg('Erro ao carregar',false));
+    document.getElementById('list').innerHTML=h||'<p style="text-align:center;color:#666">'+esc(tr('no_credentials'))+'</p>';
+  }).catch(()=>msg(tr('load_error'),false));
 }
 function loadSort(){
   return fetch('/api/sort').then(r=>{if(!r.ok)throw 0;return r.json()}).then(d=>{
@@ -168,21 +223,23 @@ function saveSort(){
   const select=document.getElementById('sort');select.disabled=true;
   fetch('/api/sort',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
     body:'mode='+select.value}).then(r=>{if(!r.ok)throw 0;return r.json()}).then(()=>load())
-    .catch(()=>{msg('Erro ao salvar ordem',false);return loadSort()})
-    .catch(()=>msg('Erro ao carregar ordem',false)).finally(()=>{select.disabled=false});
+    .catch(()=>{msg(tr('sort_error'),false);return loadSort()})
+    .catch(()=>msg(tr('sort_load_error'),false)).finally(()=>{select.disabled=false});
 }
 function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
 function showDetail(id){
   fetch('/api/get?id='+id).then(r=>r.json()).then(c=>{
-    selId=id;selFavorite=c.favorite;
-    document.getElementById('d-favorite').textContent=c.favorite?'Desmarcar favorita':'Favoritar';
+    selId=id;selFavorite=c.favorite;selCategory=c.category;
+    document.getElementById('d-category').textContent=tr(typeKeys[selCategory]);
+    document.getElementById('d-category').style.color=typeColors[selCategory];
+    document.getElementById('d-favorite').textContent=c.favorite?tr('unfavorite_long'):tr('favorite');
     document.getElementById('d-favorite').setAttribute('aria-pressed',String(c.favorite));
     document.getElementById('d-name').textContent=c.name;
     document.getElementById('d-user').textContent=c.user;
     document.getElementById('d-pass').textContent=c.pass;
     document.getElementById('detail').style.display='block';
     document.getElementById('form-area').style.display='none';
-  }).catch(()=>msg('Erro',false));
+  }).catch(()=>msg(tr('error'),false));
 }
 function favoriteCred(){
   const id=selId;
@@ -190,7 +247,7 @@ function favoriteCred(){
     body:'id='+id+'&favorite='+(selFavorite?'0':'1')}).then(r=>r.json()).then(d=>{
       if(!d.ok)throw 0;
       load();if(selId===id)showDetail(id);
-    }).catch(()=>msg('Erro ao favoritar',false));
+    }).catch(()=>msg(tr('favorite_error'),false));
 }
 function closeDetail(){document.getElementById('detail').style.display='none';selId=-1}
 function editCred(){
@@ -198,19 +255,21 @@ function editCred(){
   document.getElementById('f-user').value=document.getElementById('d-user').textContent;
   document.getElementById('f-pass').value=document.getElementById('d-pass').textContent;
   document.getElementById('f-id').value=selId;
+  document.getElementById('f-category').value=selCategory;
   document.getElementById('form-area').style.display='block';
   document.getElementById('detail').style.display='none';
 }
-function delCred(){if(!confirm('Excluir?'))return;
+function delCred(){if(!confirm(tr('delete_confirm')))return;
   fetch('/api/del?id='+selId,{method:'POST'}).then(r=>r.json()).then(d=>{
-    msg(d.ok?'Excluido':'Erro',d.ok);closeDetail();load();
-  }).catch(()=>msg('Erro',false));
+    msg(d.ok?tr('deleted'):tr('error'),d.ok);closeDetail();load();
+  }).catch(()=>msg(tr('error'),false));
 }
 function openAdd(){
   document.getElementById('f-name').value='';
   document.getElementById('f-user').value='';
   document.getElementById('f-pass').value='';
   document.getElementById('f-id').value=-1;
+  document.getElementById('f-category').value='0';
   document.getElementById('form-area').style.display='block';
   document.getElementById('detail').style.display='none';
 }
@@ -234,38 +293,38 @@ function saveCred(){
   const u=document.getElementById('f-user').value.trim();
   const p=document.getElementById('f-pass').value.trim();
   const id=parseInt(document.getElementById('f-id').value);
-  if(!n||!u||!p){msg('Preencha todos',false);return}
+  if(!n||!u||!p){msg(tr('fill_all'),false);return}
   const body='id='+id+'&name='+encodeURIComponent(n)+'&user='+
-    encodeURIComponent(u)+'&pass='+encodeURIComponent(p);
+    encodeURIComponent(u)+'&pass='+encodeURIComponent(p)+'&category='+document.getElementById('f-category').value;
   fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body})
-    .then(r=>r.json()).then(d=>{msg(d.ok?'Salvo':'Erro',d.ok);closeForm();load();
-  }).catch(()=>msg('Erro',false));
+    .then(r=>r.json()).then(d=>{if(!d.ok)throw 0;msg(tr('saved'),true);closeForm();load();
+  }).catch(()=>msg(tr('error'),false));
 }
 function backupPw(){const p=document.getElementById('b-pw').value;
-  if(p.length<8){msg('Senha do backup: m\u00ednimo 8 caracteres',false);return null}return p}
-function doExport(){const p=backupPw();if(!p)return;msg('Gerando...',true);
+  if(p.length<8){msg(tr('backup_short'),false);return null}return p}
+function doExport(){const p=backupPw();if(!p)return;msg(tr('generating'),true);
   fetch('/api/export',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
     body:'pw='+encodeURIComponent(p)}).then(r=>{if(!r.ok)throw 0;return r.blob()}).then(b=>{
     const a=document.createElement('a');a.href=URL.createObjectURL(b);
     a.download='passvault-backup-'+new Date().toISOString().slice(0,10)+'.json';
     document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(a.href);
-    msg('Backup exportado',true)}).catch(()=>msg('Erro ao exportar',false));
+    msg(tr('export_done'),true)}).catch(()=>msg(tr('export_error'),false));
 }
 function doImport(inp){const f=inp.files[0];inp.value='';if(!f)return;
   const p=backupPw();if(!p)return;
   f.text().then(t=>{const j=JSON.parse(t);
-    if(j.app!=='PassVault'||(j.v!==1&&j.v!==2)||!Array.isArray(j.creds))throw 0;
+    if(j.app!=='PassVault'||(j.v!==1&&j.v!==2&&j.v!==3)||!Array.isArray(j.creds))throw 0;
     let body='pw='+encodeURIComponent(p)+'&v='+j.v+'&iter='+j.iter+'&salt='+j.salt+'&ver='+j.ver+
       '&mac='+j.mac+'&n='+j.creds.length;
     j.creds.forEach((c,i)=>body+='&c'+i+'='+encodeURIComponent(c));
-    msg('Importando...',true);
+    msg(tr('importing'),true);
     return fetch('/api/import',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body})
   }).then(r=>r.json()).then(d=>{
-    if(d.ok){msg(d.added+' importada(s), '+d.skipped+' ignorada(s)',true);load()}
-    else msg(d.err==='pw'?'Senha do backup incorreta':'Arquivo inv\u00e1lido',false);
-  }).catch(()=>msg('Arquivo inv\u00e1lido',false));
+    if(d.ok){msg(tr('import_result').replace('{added}',d.added).replace('{skipped}',d.skipped),true);load()}
+    else msg(d.err==='pw'?tr('backup_wrong'):tr('invalid_file'),false);
+  }).catch(()=>msg(tr('invalid_file'),false));
 }
-loadSort().then(()=>load()).catch(()=>msg('Erro ao carregar ordem',false));
+loadLanguage().then(()=>loadSort()).then(()=>load()).catch(()=>msg(tr('load_error'),false));
 </script>
 </body>
 </html>
@@ -286,11 +345,31 @@ void handleList() {
     if (position) json += ",";
     json += "{\"id\":" + String(i) + ",\"favorite\":" +
             (creds[i].favorite ? "true" : "false") +
+            ",\"category\":" + String(creds[i].category) +
             ",\"name\":\"" + jsonEsc(creds[i].name) +
             "\",\"user\":\"" + jsonEsc(creds[i].user) + "\"}";
   }
   json += "]";
   server.send(200, "application/json", json);
+}
+
+void handleLanguageGet() {
+  webTouch();
+  server.send(200, "application/json", LANGUAGE_WEB_JSON[activeLanguage]);
+}
+
+void handleLanguageSave() {
+  webTouch();
+  String value = server.arg("language");
+  if (value.length() != 1 || value[0] < '0' || value[0] >= '0' + LANGUAGE_COUNT) {
+    server.send(400, "application/json", "{\"ok\":false}");
+    return;
+  }
+  if (!setLanguage(value[0] - '0')) {
+    server.send(500, "application/json", "{\"ok\":false}");
+    return;
+  }
+  server.send(200, "application/json", LANGUAGE_WEB_JSON[activeLanguage]);
 }
 
 void handleSortGet() {
@@ -317,7 +396,8 @@ void handleGet() {
   String json = "{\"name\":\"" + jsonEsc(creds[id].name) +
                 "\",\"user\":\"" + jsonEsc(creds[id].user) +
                 "\",\"pass\":\"" + jsonEsc(creds[id].pass) + "\",\"favorite\":" +
-                (creds[id].favorite ? "true" : "false") + "}";
+                (creds[id].favorite ? "true" : "false") +
+                ",\"category\":" + String(creds[id].category) + "}";
   server.send(200, "application/json", json);
 }
 
@@ -332,11 +412,21 @@ void handleSave() {
   String pass = server.arg("pass");
   int id = server.hasArg("id") ? server.arg("id").toInt() : -1;
 
+  uint8_t category = CATEGORY_COUNT;
+  if (server.hasArg("category")) {
+    String value = server.arg("category");
+    if (value.length() != 1 || value[0] < '0' || value[0] >= '0' + CATEGORY_COUNT) {
+      server.send(400, "application/json", "{\"ok\":false}");
+      return;
+    }
+    category = value[0] - '0';
+  }
   bool ok;
   if (id >= 0 && id < credCount) {
-    ok = updateCredential(id, name.c_str(), user.c_str(), pass.c_str());
+    ok = updateCredential(id, name.c_str(), user.c_str(), pass.c_str(), category);
   } else {
-    ok = addCredential(name.c_str(), user.c_str(), pass.c_str());
+    ok = addCredential(name.c_str(), user.c_str(), pass.c_str(), false,
+                       category == CATEGORY_COUNT ? uint8_t(CATEGORY_NONE) : category);
   }
   server.send(200, "application/json", ok ? "{\"ok\":true}" : "{\"ok\":false}");
 }
@@ -421,6 +511,8 @@ void startWeb() {
   webLastRequest = millis();
   server.on("/",          handleRoot);
   server.on("/api/list",  handleList);
+  server.on("/api/language", HTTP_GET, handleLanguageGet);
+  server.on("/api/language", HTTP_POST, handleLanguageSave);
   server.on("/api/sort", HTTP_GET, handleSortGet);
   server.on("/api/sort", HTTP_POST, handleSortSave);
   server.on("/api/get",   handleGet);

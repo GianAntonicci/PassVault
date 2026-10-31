@@ -184,4 +184,7 @@ uint8_t activeTheme = 0;
 #define C_DIM     (COLOR_THEMES[activeTheme].dim)
 #define C_CARD    (COLOR_THEMES[activeTheme].card)
 
+// Tipos: Sem tipo (cinza), Redes Sociais (lilas), Email (ciano), Banco (verde), Trabalho (amarelo).
+const uint16_t C_CATEGORY[] = { 0xBDF7, 0xC3FF, 0x07FF, 0x07E0, 0xFFE0 };
+
 #endif

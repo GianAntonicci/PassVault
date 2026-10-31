@@ -2,6 +2,7 @@
 
 #include <TFT_eSPI.h>
 #include "config.h"
+#include "unicode_text.h"
 
 #ifdef DISPLAY_GFX
 #include <Arduino_GFX_Library.h>
@@ -55,13 +56,22 @@ public:
   void fillScreen(uint32_t color) { dirty = true; canvas.fillSprite(color); }
   template <typename... Args> void setTextColor(Args... args) { canvas.setTextColor(args...); }
   void setTextDatum(uint8_t datum) { canvas.setTextDatum(datum); }
+  int16_t textWidth(const String& text, uint8_t font = 2) {
+    return uiHasUnicode(text.c_str()) ? uiTextWidth(text.c_str(), font) : canvas.textWidth(text, font);
+  }
+  int16_t drawFitString(const String& text, int32_t x, int32_t y, uint8_t font, int width) {
+    dirty = true;
+    return drawUiString(canvas, text, x, y, font, width);
+  }
+  int16_t drawString(const String& text, int32_t x, int32_t y, uint8_t font = 2) {
+    return drawFitString(text, x, y, font, uiAvailableWidth(canvas, x));
+  }
 #define VAULT_DRAW_METHOD(name) \
   template <typename... Args> auto name(Args... args) { \
     dirty = true; return canvas.name(args...); \
   }
   VAULT_DRAW_METHOD(fillRoundRect)
   VAULT_DRAW_METHOD(drawRoundRect)
-  VAULT_DRAW_METHOD(drawString)
   VAULT_DRAW_METHOD(fillCircle)
   VAULT_DRAW_METHOD(drawRect)
   VAULT_DRAW_METHOD(fillRect)
@@ -73,6 +83,15 @@ public:
 class VaultDisplay : public TFT_eSPI {
 public:
   bool init() { TFT_eSPI::init(); return true; }
+  int16_t textWidth(const String& text, uint8_t font = 2) {
+    return uiHasUnicode(text.c_str()) ? uiTextWidth(text.c_str(), font) : TFT_eSPI::textWidth(text, font);
+  }
+  int16_t drawFitString(const String& text, int32_t x, int32_t y, uint8_t font, int width) {
+    return drawUiString(static_cast<TFT_eSPI&>(*this), text, x, y, font, width);
+  }
+  int16_t drawString(const String& text, int32_t x, int32_t y, uint8_t font = 2) {
+    return drawFitString(text, x, y, font, uiAvailableWidth(*this, x));
+  }
   void present() {}
   void brightness(uint8_t value) {
     analogWrite(TFT_BL, TFT_BACKLIGHT_ON == HIGH ? value : 255 - value);
