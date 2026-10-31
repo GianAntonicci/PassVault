@@ -24,6 +24,7 @@ int         credCount = 0;
 uint8_t     aesKey[32];
 uint8_t     salt[16];
 unsigned long autoLockMs = AUTOLOCK_MS;
+uint8_t displayBrightness = BRIGHTNESS_DEFAULT;
 bool storageReady = false;
 
 bool validAutoLock(unsigned long ms) {
@@ -43,6 +44,14 @@ bool setTheme(uint8_t theme) {
   if (theme == activeTheme) return true;
   if (prefs.putUChar("theme", theme) != sizeof(uint8_t)) return false;
   activeTheme = theme;
+  return true;
+}
+
+bool setBrightness(uint8_t percent) {
+  if (percent < BRIGHTNESS_MIN || percent > BRIGHTNESS_MAX) return false;
+  if (percent == displayBrightness) return true;
+  if (prefs.putUChar("brightness", percent) != sizeof(uint8_t)) return false;
+  displayBrightness = percent;
   return true;
 }
 
@@ -315,6 +324,9 @@ bool storageBegin() {
   autoLockMs = validAutoLock(saved) ? saved : AUTOLOCK_MS;
   uint8_t theme = prefs.getUChar("theme", 0);
   activeTheme = theme < THEME_COUNT ? theme : 0;
+  uint8_t brightness = prefs.getUChar("brightness", BRIGHTNESS_DEFAULT);
+  displayBrightness = brightness >= BRIGHTNESS_MIN && brightness <= BRIGHTNESS_MAX
+                        ? brightness : BRIGHTNESS_DEFAULT;
   storageReady = true;
   return true;
 }

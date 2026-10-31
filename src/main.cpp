@@ -18,7 +18,7 @@ TFT_eSPI tft = TFT_eSPI();
 #include "vault_web.h"
 
 // ---- State machine ----
-enum State { ST_PIN_SETUP, ST_PIN_CONFIRM, ST_PIN_ENTRY, ST_MENU, ST_DETAIL, ST_WEB, ST_SEARCH, ST_SETTINGS, ST_THEMES,
+enum State { ST_PIN_SETUP, ST_PIN_CONFIRM, ST_PIN_ENTRY, ST_MENU, ST_DETAIL, ST_WEB, ST_SEARCH, ST_SETTINGS, ST_THEMES, ST_BRIGHTNESS,
              ST_PIN_CURRENT, ST_PIN_NEW, ST_PIN_NEW_CONFIRM };
 State state = ST_PIN_ENTRY;
 
@@ -797,11 +797,21 @@ void handleDetailTouch(int tx, int ty) {
 // ---- Configuracoes ----
 #define SETTINGS_X       10
 #define SETTINGS_W       (SCR_W - 20)
+#ifdef USE_LANDSCAPE
+  #define SETTINGS_H       26
+  #define SETTINGS_LOCK_Y  34
+  #define SETTINGS_WIFI_Y  66
+  #define SETTINGS_THEME_Y 98
+  #define SETTINGS_PIN_Y   130
+  #define SETTINGS_BRIGHT_Y 162
+#else
 #define SETTINGS_H       30
 #define SETTINGS_LOCK_Y  38
 #define SETTINGS_WIFI_Y  96
 #define SETTINGS_THEME_Y 130
 #define SETTINGS_PIN_Y   164
+#define SETTINGS_BRIGHT_Y 198
+#endif
 #define SETTINGS_BACK_Y  (SCR_H - SETTINGS_H - 8)
 
 void drawSettings() {
@@ -817,14 +827,63 @@ void drawSettings() {
   else
     snprintf(label, sizeof(label), "Auto-lock: %lu min", autoLockMs / 60000UL);
   btn(SETTINGS_X, SETTINGS_LOCK_Y, SETTINGS_W, SETTINGS_H, label, C_ACCENT);
+#ifndef USE_LANDSCAPE
   tft.setTextColor(C_DIM);
   tft.setTextDatum(TC_DATUM);
   tft.drawString("Pressione para mudar", SCR_W / 2, SETTINGS_LOCK_Y + SETTINGS_H + 6, 2);
+#endif
   btn(SETTINGS_X, SETTINGS_WIFI_Y, SETTINGS_W, SETTINGS_H, "Ativar WiFi", C_BTN);
   btn(SETTINGS_X, SETTINGS_THEME_Y, SETTINGS_W, SETTINGS_H, "Temas", C_ACCENT);
   btn(SETTINGS_X, SETTINGS_PIN_Y, SETTINGS_W, SETTINGS_H, "Alterar PIN", C_BTN);
+  btn(SETTINGS_X, SETTINGS_BRIGHT_Y, SETTINGS_W, SETTINGS_H, "Brilho", C_ACCENT);
   btn(SETTINGS_X, SETTINGS_BACK_Y, SETTINGS_W, SETTINGS_H, "Voltar", C_BTN);
   focusEnd();
+}
+
+// ---- Brilho: PWM de 8 bits, respeitando a polaridade do backlight ----
+void applyBrightness() {
+  int duty = (displayBrightness * 255 + 50) / 100;
+  analogWrite(TFT_BL, TFT_BACKLIGHT_ON == HIGH ? duty : 255 - duty);
+}
+
+#define BRIGHT_BTN_Y  108
+#define BRIGHT_BTN_W  ((SETTINGS_W - 12) / 2)
+#define BRIGHT_BTN_H  38
+
+void drawBrightness(const char* status = "", bool failed = false) {
+  focusBegin(ST_BRIGHTNESS);
+  tft.fillScreen(C_BG);
+  tft.setTextColor(C_ACCENT);
+  tft.setTextDatum(TC_DATUM);
+  tft.drawString("Brilho", SCR_W / 2, 12, 2);
+  char label[8];
+  snprintf(label, sizeof(label), "%u%%", (unsigned int)displayBrightness);
+  tft.setTextColor(C_TEXT);
+  tft.drawString(label, SCR_W / 2, 56, 4);
+  btn(SETTINGS_X, BRIGHT_BTN_Y, BRIGHT_BTN_W, BRIGHT_BTN_H, "-", C_BTN);
+  btn(SCR_W - SETTINGS_X - BRIGHT_BTN_W, BRIGHT_BTN_Y, BRIGHT_BTN_W, BRIGHT_BTN_H, "+", C_BTN);
+  tft.setTextColor(failed ? C_WARN : C_TEXT);
+  tft.setTextDatum(TC_DATUM);
+  tft.drawString(status, SCR_W / 2, BRIGHT_BTN_Y + BRIGHT_BTN_H + 12, 2);
+  btn(SETTINGS_X, SETTINGS_BACK_Y, SETTINGS_W, SETTINGS_H, "Voltar", C_BTN);
+  focusEnd();
+}
+
+void handleBrightnessTouch(int tx, int ty) {
+  int next = displayBrightness;
+  if (inBox(tx, ty, SETTINGS_X, BRIGHT_BTN_Y, BRIGHT_BTN_W, BRIGHT_BTN_H))
+    next = max(BRIGHTNESS_MIN, next - BRIGHTNESS_STEP);
+  else if (inBox(tx, ty, SCR_W - SETTINGS_X - BRIGHT_BTN_W, BRIGHT_BTN_Y, BRIGHT_BTN_W, BRIGHT_BTN_H))
+    next = min(BRIGHTNESS_MAX, next + BRIGHTNESS_STEP);
+  else if (inBox(tx, ty, SETTINGS_X, SETTINGS_BACK_Y, SETTINGS_W, SETTINGS_H)) {
+    state = ST_SETTINGS;
+    drawSettings();
+    return;
+  } else return;
+  if (next == displayBrightness) return;
+  bool saved = setBrightness(next);
+  if (saved) applyBrightness();
+  drawBrightness(saved ? "Brilho salvo" : "Falha ao salvar", !saved);
 }
 
 // ---- Aba de temas: selecao com aplicacao imediata ----
@@ -872,10 +931,17 @@ void handleSettingsTouch(int tx, int ty) {
     bool saved = setAutoLock(AUTOLOCK_OPTIONS_MS[next]);
     drawSettings();
     if (!saved) {
+#ifdef USE_LANDSCAPE
+      tft.fillRect(0, 190, SCR_W, 16, C_BG);
+      tft.setTextColor(C_WARN);
+      tft.setTextDatum(TC_DATUM);
+      tft.drawString("Falha ao salvar", SCR_W / 2, 190, 2);
+#else
       tft.fillRect(0, SETTINGS_LOCK_Y + SETTINGS_H + 6, SCR_W, 16, C_BG);
       tft.setTextColor(C_WARN);
       tft.setTextDatum(TC_DATUM);
       tft.drawString("Falha ao salvar", SCR_W / 2, SETTINGS_LOCK_Y + SETTINGS_H + 6, 2);
+#endif
     }
   } else if (inBox(tx, ty, SETTINGS_X, SETTINGS_WIFI_Y, SETTINGS_W, SETTINGS_H)) {
     startWeb();
@@ -884,6 +950,9 @@ void handleSettingsTouch(int tx, int ty) {
   } else if (inBox(tx, ty, SETTINGS_X, SETTINGS_THEME_Y, SETTINGS_W, SETTINGS_H)) {
     state = ST_THEMES;
     drawThemes();
+  } else if (inBox(tx, ty, SETTINGS_X, SETTINGS_BRIGHT_Y, SETTINGS_W, SETTINGS_H)) {
+    state = ST_BRIGHTNESS;
+    drawBrightness();
   } else if (inBox(tx, ty, SETTINGS_X, SETTINGS_PIN_Y, SETTINGS_W, SETTINGS_H)) {
     clearPinBuffers();
     pinLen = storagePinLen();
@@ -960,6 +1029,7 @@ void handleBack() {
       closeWeb();
       break;
     case ST_THEMES:
+    case ST_BRIGHTNESS:
       state = ST_SETTINGS;
       drawSettings();
       break;
@@ -1005,6 +1075,9 @@ void setup() {
     tft.drawString("Reinicie o aparelho", SCR_W / 2, SCR_H / 2 + 12, 2);
     return;
   }
+
+  // TFT_eSPI inicializa o backlight ligado: restaura o PWM depois do init.
+  applyBrightness();
 
   if (storageHasPin()) {
     pinLen = storagePinLen();
@@ -1059,7 +1132,7 @@ void loop() {
     return;
   }
 
-  if ((state == ST_MENU || state == ST_DETAIL || state == ST_SEARCH || state == ST_SETTINGS || state == ST_THEMES || changingPin()) && millis() - lastAction >= autoLockMs) {
+  if ((state == ST_MENU || state == ST_DETAIL || state == ST_SEARCH || state == ST_SETTINGS || state == ST_THEMES || state == ST_BRIGHTNESS || changingPin()) && millis() - lastAction >= autoLockMs) {
     lockDevice();
     return;
   }
@@ -1107,6 +1180,9 @@ void loop() {
       break;
     case ST_THEMES:
       handleThemesTouch(tx, ty);
+      break;
+    case ST_BRIGHTNESS:
+      handleBrightnessTouch(tx, ty);
       break;
   }
 }

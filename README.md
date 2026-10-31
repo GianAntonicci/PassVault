@@ -11,6 +11,7 @@ It is a PlatformIO project with one firmware and a build environment for each su
 - **PIN lock:** a 6-digit PIN entered on an on-screen numpad. The PIN is created on first boot.
 - **Attempt limit:** the wrong-PIN counter is stored in flash, so rebooting does not reset it. After 5 wrong PINs the device locks for 30 s, and the wait doubles with each further error. On the 10th wrong PIN, **the whole vault is erased**.
 - **Auto-lock:** after a configurable inactivity timeout (60 s by default), the device locks and the decrypted credentials are wiped from RAM. Choose 30 s, 60 s, 2 min, 5 min or 10 min in **Config. → Auto-lock**; the choice survives a restart.
+- **Display brightness:** open **Config. → Brilho** and use **−/+** to adjust from 10% to 100% in 10% steps (default: 100%). Changes apply immediately and are saved in NVS, including across restarts. Touch and physical-button navigation are supported. On generic displays, the backlight must be connected to the configured `TFT_BL` pin through a PWM-capable backlight circuit.
 - **Encrypted storage:** each credential is AES-256-CBC encrypted with a random IV and stored in NVS flash.
 - **Auto-typing:** each credential offers *All* (user + TAB + password), *Login* (user only) or *Password* (password only).
 - **Wi-Fi management:** an on-demand Wi-Fi access point with a single-page web app to list, add, edit and delete credentials. Each time it is turned on it gets a **new random password**, accepts only one client, and shuts down after 5 minutes without use.

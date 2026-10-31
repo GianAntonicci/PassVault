@@ -80,6 +80,10 @@
 #define AUTOLOCK_MS     60000UL  // padrao quando nao ha preferencia salva
 constexpr unsigned long AUTOLOCK_OPTIONS_MS[] = {30000UL, 60000UL, 120000UL, 300000UL, 600000UL};
 constexpr size_t AUTOLOCK_OPTION_COUNT = sizeof(AUTOLOCK_OPTIONS_MS) / sizeof(AUTOLOCK_OPTIONS_MS[0]);
+#define BRIGHTNESS_MIN     10  // nunca apaga a tela durante o ajuste
+#define BRIGHTNESS_MAX    100
+#define BRIGHTNESS_STEP    10
+#define BRIGHTNESS_DEFAULT 100
 
 // ---- Seguranca ----
 // Tamanho do PIN de vaults NOVOS (vaults antigos continuam com 4)
