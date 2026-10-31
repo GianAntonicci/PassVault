@@ -13,10 +13,10 @@ Context instructions for any AI or developer working on this project.
 ## Releases with pushes and pull requests
 
 - Whenever the user requests a push or a pull request, include publishing a GitHub Release as part of that workflow, unless the user explicitly asks to skip it. This is standing authorization to create the necessary version tag and release; do not ask for separate confirmation.
-- Publish one release per distinct delivered commit, even when the workflow includes both a push and a pull request. Check existing tags and releases first to avoid duplicates. Tag the exact commit pushed or proposed in the PR, and link the release and PR in the final response.
-- Use semantic versions with a `v` prefix. Choose the next version from existing releases and Conventional Commits: breaking changes increment the major version, features the minor version, and fixes or documentation the patch version. If no version exists, start at `v0.1.0`. Never move or overwrite an existing tag or release.
+- Publish exactly one release per pull request, covering all changes and commits in that PR. Never publish separate releases for individual commits in the same PR. A workflow that includes both a push and a PR must publish only that single release. For a push-only workflow, publish one release covering all commits delivered in that push. Check existing tags and releases first to avoid duplicates. Tag the PR's exact head commit (or the exact pushed head commit for a push-only workflow), and link the release and PR in the final response.
+- Use semantic versions with a `v` prefix. Choose the next version from existing releases and the highest-impact Conventional Commit across all changes included in the release: breaking changes increment the major version, features the minor version, and fixes or documentation the patch version. If no version exists, start at `v0.1.0`. Never move or overwrite an existing tag or release.
 - For commits on `dev` or another branch awaiting integration into `main`, publish a GitHub prerelease with a unique suffix, such as `v0.1.0-rc.1`. Publish a stable release only for a commit already integrated into `main`. This does not authorize merging a PR automatically.
-- Include release notes describing the delivered changes, validation performed and known limitations. Complete the applicable build checks before publishing; do not claim hardware validation unless it was actually performed.
+- Include release notes describing all changes in the PR (or push-only delivery), validation performed and known limitations. Complete the applicable build checks before publishing; do not claim hardware validation unless it was actually performed.
 
 ## Overview
 
