@@ -21,7 +21,7 @@ VaultDisplay tft;
 
 // ---- State machine ----
 enum State { ST_PIN_SETUP, ST_PIN_CONFIRM, ST_PIN_ENTRY, ST_MENU, ST_DETAIL, ST_WEB, ST_SEARCH, ST_SETTINGS, ST_THEMES, ST_BRIGHTNESS, ST_SORT,
-             ST_PIN_CURRENT, ST_PIN_NEW, ST_PIN_NEW_CONFIRM };
+             ST_PIN_CURRENT, ST_PIN_NEW, ST_PIN_NEW_CONFIRM, ST_LANGUAGES };
 State state = ST_PIN_ENTRY;
 ScreenFade screenFade;
 
@@ -94,7 +94,7 @@ void btn(int x, int y, int w, int h, const char* label, uint16_t bg) {
   tft.fillRoundRect(x, y, w, h, 5, bg);
   tft.setTextColor(C_BG, bg);
   tft.setTextDatum(MC_DATUM);
-  tft.drawString(label, x + w / 2, y + h / 2, 2);
+  tft.drawFitString(label, x + w / 2, y + h / 2, 2, w - 8);
   focusAdd(x, y, w, h);
 }
 
@@ -158,14 +158,14 @@ void drawPinScreen(const char* title) {
 
   tft.setTextColor(C_DIM);
   tft.setTextDatum(TC_DATUM);
-  char msg[24];
-  snprintf(msg, sizeof(msg), "Digite %d digitos", pinLen);
+  char msg[128];
+  snprintf(msg, sizeof(msg), tr(TXT_DIGITS), pinLen);
   tft.drawString(msg, SCR_W / 2, PIN_MSG_Y, 2);
 
   drawPinBoxes();
   drawNumpad();
   if (changingPin()) {
-    btn(10, PIN_CANCEL_Y, SCR_W - 20, PIN_CANCEL_H, "Cancelar", C_BTN);
+    btn(10, PIN_CANCEL_Y, SCR_W - 20, PIN_CANCEL_H, tr(TXT_CANCEL), C_BTN);
   }
   focusEnd();
 }
@@ -201,19 +201,19 @@ unsigned long lockoutDuration(int fails) {
 void drawLockout() {
   int fails = storageFails();
   unsigned long left = lockoutEnd > millis() ? (lockoutEnd - millis() + 999) / 1000 : 0;
-  char buf[32];
+  char buf[128];
 
   tft.setTextDatum(MC_DATUM);
   tft.setTextColor(C_WARN, C_BG);
-  tft.drawString("BLOQUEADO", SCR_W / 2, SCR_H / 2 - 30, 4);
+  tft.drawString(tr(TXT_LOCKED), SCR_W / 2, SCR_H / 2 - 30, 4);
 
   tft.fillRect(0, SCR_H / 2 - 4, SCR_W, 18, C_BG);
-  snprintf(buf, sizeof(buf), "Aguarde %lus", left);
+  snprintf(buf, sizeof(buf), tr(TXT_WAIT), left);
   tft.drawString(buf, SCR_W / 2, SCR_H / 2 + 5, 2);
 
   if (WIPE_AFTER > 0) {
     tft.setTextColor(C_DIM, C_BG);
-    snprintf(buf, sizeof(buf), "Apaga apos %d erros", WIPE_AFTER - fails);
+    snprintf(buf, sizeof(buf), tr(TXT_WIPE_AFTER), WIPE_AFTER - fails);
     tft.drawString(buf, SCR_W / 2, SCR_H / 2 + 30, 2);
   }
 }
@@ -227,7 +227,7 @@ void startLockout(int fails) {
   drawLockout();
 }
 
-// Limite atingido: apaga o vault e reinicia em "Criar PIN"
+// Limite atingido: apaga o vault e reinicia na criacao do PIN.
 void wipeVault() {
   cancelScreenFade();
   storageWipe();
@@ -236,8 +236,8 @@ void wipeVault() {
   tft.fillScreen(C_BG);
   tft.setTextColor(C_WARN);
   tft.setTextDatum(MC_DATUM);
-  tft.drawString("VAULT", SCR_W / 2, SCR_H / 2 - 20, 4);
-  tft.drawString("APAGADO", SCR_W / 2, SCR_H / 2 + 10, 4);
+  tft.drawString(tr(TXT_VAULT), SCR_W / 2, SCR_H / 2 - 20, 4);
+  tft.drawString(tr(TXT_WIPED), SCR_W / 2, SCR_H / 2 + 10, 4);
   tft.present();
   delay(4000);
   ESP.restart();
@@ -285,11 +285,11 @@ void handlePinTouch(int tx, int ty) {
       mbedtls_platform_zeroize(pinBuf, sizeof(pinBuf));
       pinPos = 0;
       state = ST_PIN_CONFIRM;
-      drawPinScreen("Confirme PIN");
+      drawPinScreen(tr(TXT_CONFIRM_PIN));
 
     } else if (state == ST_PIN_CONFIRM) {
       if (strcmp(pinBuf, pinConfirm) == 0) {
-        drawBusy("Gerando chave...");
+        drawBusy(tr(TXT_GENERATING_KEY));
         setupPin(pinBuf);
         storageResetFails();
         loadCredentials();
@@ -299,8 +299,8 @@ void handlePinTouch(int tx, int ty) {
       } else {
         clearPinBuffers();
         state = ST_PIN_SETUP;
-        drawPinScreen("Criar PIN");
-        drawPinWarn("PINs diferentes!");
+        drawPinScreen(tr(TXT_CREATE_PIN));
+        drawPinWarn(tr(TXT_PIN_MISMATCH));
       }
 
     } else if (state == ST_PIN_NEW) {
@@ -308,16 +308,16 @@ void handlePinTouch(int tx, int ty) {
       mbedtls_platform_zeroize(pinBuf, sizeof(pinBuf));
       pinPos = 0;
       state = ST_PIN_NEW_CONFIRM;
-      drawPinScreen("Confirme PIN");
+      drawPinScreen(tr(TXT_CONFIRM_PIN));
     } else if (state == ST_PIN_NEW_CONFIRM) {
       if (strcmp(pinBuf, pinConfirm) != 0) {
         clearPinBuffers();
         state = ST_PIN_NEW;
-        drawPinScreen("Novo PIN");
-        drawPinWarn("PINs diferentes!");
+        drawPinScreen(tr(TXT_NEW_PIN));
+        drawPinWarn(tr(TXT_PIN_MISMATCH));
         return;
       }
-      drawBusy("Salvando PIN...");
+      drawBusy(tr(TXT_SAVING_PIN));
       PinChangeResult result = changePin(pinBuf);
       clearPinBuffers();
       if (result == PIN_CHANGE_PENDING) {
@@ -326,13 +326,13 @@ void handlePinTouch(int tx, int ty) {
         return;
       }
       lockDevice();
-      if (result == PIN_CHANGE_OK) drawBusy("PIN alterado!");
-      else drawPinWarn("Falha ao salvar");
+      if (result == PIN_CHANGE_OK) drawBusy(tr(TXT_PIN_CHANGED));
+      else drawPinWarn(tr(TXT_SAVE_FAILED));
     } else if (state == ST_PIN_ENTRY || state == ST_PIN_CURRENT) {
       bool change = state == ST_PIN_CURRENT;
       // Conta o erro ANTES de verificar: desligar no meio nao zera o contador
       int fails = storageAddFail();
-      drawBusy("Verificando...");
+      drawBusy(tr(TXT_VERIFYING));
       bool ok = verifyPin(pinBuf);
       clearPinBuffers();
 
@@ -341,7 +341,7 @@ void handlePinTouch(int tx, int ty) {
         if (change) {
           pinLen = PIN_LEN;
           state = ST_PIN_NEW;
-          drawPinScreen("Novo PIN");
+          drawPinScreen(tr(TXT_NEW_PIN));
         } else {
           loadCredentials();
           state = ST_MENU;
@@ -352,9 +352,9 @@ void handlePinTouch(int tx, int ty) {
         if (change) lockDevice();
         if (WIPE_AFTER > 0 && fails >= WIPE_AFTER) { wipeVault(); return; }
         if (fails >= LOCKOUT_AFTER) { startLockout(fails); return; }
-        drawPinScreen("Digite PIN");
-        char msg[24];
-        snprintf(msg, sizeof(msg), "PIN errado (%d/%d)", fails, LOCKOUT_AFTER);
+        drawPinScreen(tr(TXT_ENTER_PIN));
+        char msg[128];
+        snprintf(msg, sizeof(msg), tr(TXT_WRONG_PIN), fails, LOCKOUT_AFTER);
         drawPinWarn(msg);
       }
     }
@@ -362,7 +362,7 @@ void handlePinTouch(int tx, int ty) {
 }
 
 // ---- Menu ----
-#define MENU_ITEM_H  30
+#define MENU_ITEM_H  36
 #define MENU_VISIBLE ((SCR_H - 65 - MENU_LIST_Y) / MENU_ITEM_H)
 #define MENU_BTN_W   75
 #define MENU_BTN_H   38
@@ -448,7 +448,7 @@ void drawMenu() {
   tft.drawRoundRect(SRCH_X, SRCH_Y, SRCH_W, SRCH_H, 4, searchBuf[0] ? C_ACCENT : C_DIM);
   tft.setTextColor(searchBuf[0] ? C_TEXT : C_DIM);
   tft.setTextDatum(ML_DATUM);
-  tft.drawString(searchBuf[0] ? searchBuf : "Buscar...", SRCH_X + 8, SRCH_Y + SRCH_H / 2, 2);
+  tft.drawString(searchBuf[0] ? searchBuf : tr(TXT_SEARCH_HINT), SRCH_X + 8, SRCH_Y + SRCH_H / 2, 2);
   focusAdd(SRCH_X, SRCH_Y, SRCH_W, SRCH_H);
 
   int y = MENU_LIST_Y;
@@ -456,7 +456,7 @@ void drawMenu() {
   if (filtCount == 0) {
     tft.setTextColor(C_DIM);
     tft.setTextDatum(TC_DATUM);
-    tft.drawString(credCount ? "Nada encontrado" : "Nenhuma credencial", SCR_W / 2, y + 20, 2);
+    tft.drawString(credCount ? tr(TXT_NONE_FOUND) : tr(TXT_NO_CREDENTIALS), SCR_W / 2, y + 20, 2);
   } else {
     for (int i = menuTop; i < filtCount && i < menuTop + visible; i++) {
       tft.fillRoundRect(4, y, MENU_ITEM_W, MENU_ITEM_H - 2, 4, C_CARD);
@@ -465,11 +465,15 @@ void drawMenu() {
       tft.setTextColor(C_TEXT);
       tft.setTextDatum(TL_DATUM);
       String label = String(creds[filt[i]].favorite ? "* " : "") + creds[filt[i]].name;
-      while (label.length() && tft.textWidth(label, 2) > MENU_ITEM_W - 16)
-        label.remove(label.length() - 1);
+      while (label.length() && tft.textWidth(label, 2) > MENU_ITEM_W - 16) {
+        int end = label.length() - 1;
+        while (end > 0 && (static_cast<uint8_t>(label[end]) & 0xC0) == 0x80) end--;
+        label.remove(end);
+      }
       tft.drawString(label, 12, y + 1, 2);
       tft.setTextColor(C_CATEGORY[category]);
-      tft.drawString(CATEGORY_LABELS[category], 12, y + 19, 1);
+      const TextId categoryLabels[] = { TXT_CAT_NONE, TXT_CAT_SOCIAL, TXT_CAT_EMAIL, TXT_CAT_BANK, TXT_CAT_WORK };
+      tft.drawFitString(tr(categoryLabels[category]), 12, y + 17, 2, MENU_ITEM_W - 16);
       // Bordas da lista rolam ao inves de mover o foco
       uint8_t flags = 0;
       if (i == menuTop && menuTop > 0) flags |= FOCUS_SCROLL_UP;
@@ -487,8 +491,8 @@ void drawMenu() {
 #endif
 
   int btnY = SCR_H - MENU_BTN_H - 6;
-  btn(6, btnY, MENU_BTN_W, MENU_BTN_H, "Config.", C_ACCENT);
-  btn(SCR_W - MENU_BTN_W - 6, btnY, MENU_BTN_W, MENU_BTN_H, "Bloquear", C_WARN);
+  btn(6, btnY, MENU_BTN_W, MENU_BTN_H, tr(TXT_SETTINGS_SHORT), C_ACCENT);
+  btn(SCR_W - MENU_BTN_W - 6, btnY, MENU_BTN_W, MENU_BTN_H, tr(TXT_LOCK), C_WARN);
   focusEnd();
 }
 
@@ -546,7 +550,7 @@ void handleMenuTouch(int tx, int ty, int gesture) {
 // ---- Busca (teclado na tela) ----
 // 36 teclas A-Z/0-9 + linha de acoes: 0=apagar 1=limpar 2=OK
 const char kbChars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-const char* kbActLabels[3] = {"<", "Limpar", "OK"};
+
 const uint16_t kbActColors[3] = {C_WARN, C_WARN, C_OK};
 
 void kbKeyPos(int i, int &x, int &y) {
@@ -573,7 +577,7 @@ void drawSearch() {
   tft.fillScreen(C_BG);
   tft.setTextColor(C_ACCENT);
   tft.setTextDatum(TL_DATUM);
-  tft.drawString("Buscar", 10, 8, 4);
+  tft.drawString(tr(TXT_SEARCH), 10, 8, 4);
   drawSearchField();
   for (int i = 0; i < KB_KEYS; i++) {
     int x, y;
@@ -582,7 +586,7 @@ void drawSearch() {
     btn(x, y, KB_KW, KB_KH, label, C_BTN);
   }
   for (int i = 0; i < 3; i++)
-    btn(4 + i * (KB_ACT_W + KB_GAP), KB_ACT_Y, KB_ACT_W, KB_ACT_H, kbActLabels[i], kbActColors[i]);
+    btn(4 + i * (KB_ACT_W + KB_GAP), KB_ACT_Y, KB_ACT_W, KB_ACT_H, (i == 0 ? "<" : i == 1 ? tr(TXT_CLEAR) : "OK"), kbActColors[i]);
   focusEnd();
 }
 
@@ -633,13 +637,13 @@ void drawTypingFeedback(const char* message, uint16_t color) {
 
 void typeCredential(int mode) {
   if (!kbdConnected()) {
-    drawTypingFeedback("Conecte o teclado", C_WARN);
+    drawTypingFeedback(tr(TXT_CONNECT_KEYBOARD), C_WARN);
     typingFeedbackVisible = true;
     typingFeedbackShownAt = millis();
     return;
   }
 
-  drawTypingFeedback("Digitando...", C_ACCENT);
+  drawTypingFeedback(tr(TXT_TYPING), C_ACCENT);
   if (mode == 0 || mode == 1 || mode == 3) {
     kbdPrint(creds[selCred].user);
     if (mode == 0 || mode == 3) {
@@ -651,7 +655,7 @@ void typeCredential(int mode) {
   }
   if (mode == 3) kbdWrite(KEY_RETURN);
   if (kbdConnected()) recordCredentialUse(selCred);
-  drawTypingFeedback(kbdConnected() ? "Envio finalizado" : "Teclado desconectado",
+  drawTypingFeedback(kbdConnected() ? tr(TXT_TYPE_DONE) : tr(TXT_KEYBOARD_LOST),
                      kbdConnected() ? C_OK : C_WARN);
   typingFeedbackVisible = true;
   typingFeedbackShownAt = millis();
@@ -668,7 +672,7 @@ void detailBtnPos(int i, int &x, int &y) {
   y = DET_Y0 + (i / columns) * (DET_BTN_H + DET_GAP);
 }
 
-const char* detLabels[DET_BTN_COUNT] = {"Tudo", "Login", "Senha", "Voltar", "Revelar", "Favoritar", "Entrar"};
+const TextId detLabels[DET_BTN_COUNT] = { TXT_ALL, TXT_LOGIN, TXT_PASSWORD, TXT_BACK, TXT_REVEAL, TXT_FAVORITE, TXT_ENTER };
 
 void drawDetailPassword() {
   // Fonte de 6x8: ate 64 caracteres cabem em 3 linhas no portrait.
@@ -696,19 +700,19 @@ void drawDetail() {
 
   tft.setTextColor(C_DIM);
   tft.setTextDatum(TL_DATUM);
-  tft.drawString("Usuario:", 10, DET_USER_LABEL_Y, 2);
+  tft.drawString(tr(TXT_USER), 10, DET_USER_LABEL_Y, 2);
   tft.setTextColor(C_TEXT);
   tft.drawString(creds[selCred].user, 10, DET_USER_Y, 2);
 
   tft.setTextColor(C_DIM);
-  tft.drawString("Senha:", 10, DET_PASS_LABEL_Y, 2);
+  tft.drawString(tr(TXT_PASSWORD), 10, DET_PASS_LABEL_Y, 2);
   drawDetailPassword();
 
   for (int i = 0; i < DET_BTN_COUNT; i++) {
     int x, y;
     detailBtnPos(i, x, y);
     btn(x, y, DET_BTN_W, DET_BTN_H,
-        i == 5 && creds[selCred].favorite ? "Desmarcar" : detLabels[i], detColors[i]);
+        i == 5 && creds[selCred].favorite ? tr(TXT_UNFAVORITE) : tr(detLabels[i]), detColors[i]);
   }
   focusEnd();
 }
@@ -745,23 +749,24 @@ void drawSettings() {
   tft.fillScreen(C_BG);
   tft.setTextColor(C_ACCENT);
   tft.setTextDatum(TC_DATUM);
-  tft.drawString("Configuracoes", SCR_W / 2, 12, 2);
+  tft.drawString(tr(TXT_SETTINGS), SCR_W / 2, 12, 2);
 
-  char label[24];
+  char label[128];
   if (autoLockMs < 60000UL)
-    snprintf(label, sizeof(label), "Auto-lock: %lu s", autoLockMs / 1000UL);
+    snprintf(label, sizeof(label), tr(TXT_AUTOLOCK_SECONDS), autoLockMs / 1000UL);
   else
-    snprintf(label, sizeof(label), "Auto-lock: %lu min", autoLockMs / 60000UL);
+    snprintf(label, sizeof(label), tr(TXT_AUTOLOCK_MINUTES), autoLockMs / 60000UL);
   btn(SETTINGS_X, SETTINGS_LOCK_Y, SETTINGS_W, SETTINGS_H, label, C_ACCENT);
   tft.setTextColor(C_DIM);
   tft.setTextDatum(TC_DATUM);
-  tft.drawString("Pressione para mudar", SCR_W / 2, SETTINGS_LOCK_Y + SETTINGS_H + 6, 2);
-  btn(SETTINGS_X, SETTINGS_WIFI_Y, SETTINGS_W, SETTINGS_H, "Ativar WiFi", C_BTN);
-  btn(SETTINGS_X, SETTINGS_THEME_Y, SETTINGS_W, SETTINGS_H, "Temas", C_ACCENT);
-  btn(SETTINGS_X, SETTINGS_PIN_Y, SETTINGS_W, SETTINGS_H, "Alterar PIN", C_BTN);
-  btn(SETTINGS_X, SETTINGS_BRIGHT_Y, SETTINGS_EXTRA_W, SETTINGS_H, "Brilho", C_ACCENT);
-  btn(SETTINGS_SORT_X, SETTINGS_SORT_Y, SETTINGS_EXTRA_W, SETTINGS_H, "Ordenar", C_BTN);
-  btn(SETTINGS_X, SETTINGS_BACK_Y, SETTINGS_W, SETTINGS_H, "Voltar", C_BTN);
+  tft.drawString(tr(TXT_TAP_CHANGE), SCR_W / 2, SETTINGS_LOCK_Y + SETTINGS_H + 6, 2);
+  btn(SETTINGS_X, SETTINGS_WIFI_Y, SETTINGS_W, SETTINGS_H, tr(TXT_WIFI_ON), C_BTN);
+  btn(SETTINGS_X, SETTINGS_THEME_Y, SETTINGS_W, SETTINGS_H, tr(TXT_THEMES), C_ACCENT);
+  btn(SETTINGS_X, SETTINGS_PIN_Y, SETTINGS_W, SETTINGS_H, tr(TXT_CHANGE_PIN), C_BTN);
+  btn(SETTINGS_X, SETTINGS_BRIGHT_Y, SETTINGS_EXTRA_W, SETTINGS_H, tr(TXT_BRIGHTNESS), C_ACCENT);
+  btn(SETTINGS_SORT_X, SETTINGS_SORT_Y, SETTINGS_PAIR_W, SETTINGS_H, tr(TXT_SORT), C_BTN);
+  btn(SETTINGS_LANGUAGE_X, SETTINGS_SORT_Y, SETTINGS_PAIR_W, SETTINGS_H, tr(TXT_LANGUAGE), C_ACCENT);
+  btn(SETTINGS_X, SETTINGS_BACK_Y, SETTINGS_W, SETTINGS_H, tr(TXT_BACK), C_BTN);
   focusEnd();
 }
 
@@ -775,7 +780,7 @@ void drawBrightness(const char* status = "", bool failed = false) {
   tft.fillScreen(C_BG);
   tft.setTextColor(C_ACCENT);
   tft.setTextDatum(TC_DATUM);
-  tft.drawString("Brilho", SCR_W / 2, 12, 2);
+  tft.drawString(tr(TXT_BRIGHTNESS), SCR_W / 2, 12, 2);
   char label[8];
   snprintf(label, sizeof(label), "%u%%", (unsigned int)displayBrightness);
   tft.setTextColor(C_TEXT);
@@ -785,7 +790,7 @@ void drawBrightness(const char* status = "", bool failed = false) {
   tft.setTextColor(failed ? C_WARN : C_TEXT);
   tft.setTextDatum(TC_DATUM);
   tft.drawString(status, SCR_W / 2, BRIGHT_BTN_Y + BRIGHT_BTN_H + 12, 2);
-  btn(SETTINGS_X, SETTINGS_BACK_Y, SETTINGS_W, SETTINGS_H, "Voltar", C_BTN);
+  btn(SETTINGS_X, SETTINGS_BACK_Y, SETTINGS_W, SETTINGS_H, tr(TXT_BACK), C_BTN);
   focusEnd();
 }
 
@@ -803,7 +808,7 @@ void handleBrightnessTouch(int tx, int ty) {
   if (next == displayBrightness) return;
   bool saved = setBrightness(next);
   if (saved) applyBrightness();
-  drawBrightness(saved ? "Brilho salvo" : "Falha ao salvar", !saved);
+  drawBrightness(saved ? tr(TXT_BRIGHTNESS_SAVED) : tr(TXT_SAVE_FAILED), !saved);
 }
 
 // ---- Aba de temas: selecao com aplicacao imediata ----
@@ -817,17 +822,17 @@ void drawThemes(const char* status = "", bool failed = false) {
   tft.fillScreen(C_BG);
   tft.setTextColor(C_ACCENT);
   tft.setTextDatum(TC_DATUM);
-  tft.drawString("Temas", SCR_W / 2, 12, 2);
+  tft.drawString(tr(TXT_THEMES), SCR_W / 2, 12, 2);
   for (size_t i = 0; i < THEME_COUNT; i++) {
-    char label[24];
-    snprintf(label, sizeof(label), "%s%s", i == activeTheme ? "* " : "", COLOR_THEMES[i].name);
+    char label[128];
+    snprintf(label, sizeof(label), "%s%s", i == activeTheme ? "* " : "", i == 0 ? "Cyber Green" : tr(i == 1 ? TXT_BLUE : i == 2 ? TXT_PURPLE : TXT_AMBER));
     btn(SETTINGS_X, THEME_Y + i * THEME_STEP, SETTINGS_W, THEME_H,
         label, COLOR_THEMES[i].accent);
   }
   tft.setTextColor(failed ? C_WARN : C_TEXT);
   tft.setTextDatum(TC_DATUM);
   tft.drawString(status, SCR_W / 2, THEME_Y + THEME_COUNT * THEME_STEP, 2);
-  btn(SETTINGS_X, SETTINGS_BACK_Y, SETTINGS_W, SETTINGS_H, "Voltar", C_BTN);
+  btn(SETTINGS_X, SETTINGS_BACK_Y, SETTINGS_W, SETTINGS_H, tr(TXT_BACK), C_BTN);
   focusEnd();
 }
 
@@ -835,7 +840,7 @@ void handleThemesTouch(int tx, int ty) {
   for (size_t i = 0; i < THEME_COUNT; i++) {
     if (!inBox(tx, ty, SETTINGS_X, THEME_Y + i * THEME_STEP, SETTINGS_W, THEME_H)) continue;
     bool saved = setTheme(i);
-    drawThemes(saved ? "Tema salvo" : "Falha ao salvar", !saved);
+    drawThemes(saved ? tr(TXT_THEME_SAVED) : tr(TXT_SAVE_FAILED), !saved);
     return;
   }
   if (inBox(tx, ty, SETTINGS_X, SETTINGS_BACK_Y, SETTINGS_W, SETTINGS_H)) {
@@ -850,16 +855,16 @@ void drawSort(const char* status = "", bool failed = false) {
   tft.fillScreen(C_BG);
   tft.setTextColor(C_ACCENT);
   tft.setTextDatum(TC_DATUM);
-  tft.drawString("Ordenacao", SCR_W / 2, 12, 2);
+  tft.drawString(tr(TXT_SORT_TITLE), SCR_W / 2, 12, 2);
   for (int i = 0; i < SORT_COUNT; i++) {
-    char label[24];
-    snprintf(label, sizeof(label), "%s%s", i == credentialSort ? "* " : "", SORT_LABELS[i]);
+    char label[128];
+    snprintf(label, sizeof(label), "%s%s", i == credentialSort ? "* " : "", tr(i == 0 ? TXT_SORT_ALPHA : i == 1 ? TXT_SORT_RECENT : i == 2 ? TXT_SORT_USED : TXT_SORT_TYPE));
     btn(SETTINGS_X, THEME_Y + i * THEME_STEP, SETTINGS_W, THEME_H, label, C_ACCENT);
   }
   tft.setTextColor(failed ? C_WARN : C_DIM);
   tft.setTextDatum(TC_DATUM);
   tft.drawString(status, SCR_W / 2, THEME_Y + SORT_COUNT * THEME_STEP, 2);
-  btn(SETTINGS_X, SETTINGS_BACK_Y, SETTINGS_W, SETTINGS_H, "Voltar", C_BTN);
+  btn(SETTINGS_X, SETTINGS_BACK_Y, SETTINGS_W, SETTINGS_H, tr(TXT_BACK), C_BTN);
   focusEnd();
 }
 
@@ -868,10 +873,54 @@ void handleSortTouch(int tx, int ty) {
     if (!inBox(tx, ty, SETTINGS_X, THEME_Y + i * THEME_STEP, SETTINGS_W, THEME_H)) continue;
     bool saved = setCredentialSort(i);
     if (saved) menuTop = 0;
-    drawSort(saved ? "Ordem salva" : "Falha ao salvar", !saved);
+    drawSort(saved ? tr(TXT_SORT_SAVED) : tr(TXT_SAVE_FAILED), !saved);
     return;
   }
   if (inBox(tx, ty, SETTINGS_X, SETTINGS_BACK_Y, SETTINGS_W, SETTINGS_H)) {
+    state = ST_SETTINGS;
+    drawSettings();
+  }
+}
+
+// Quatro idiomas por pagina cabem inclusive na tela 240x240 e no foco por botoes.
+constexpr int LANGUAGE_PAGE_SIZE = 4;
+constexpr int LANGUAGE_Y = 38, LANGUAGE_STEP = 32, LANGUAGE_H = 28;
+constexpr int LANGUAGE_NAV_Y = 170, LANGUAGE_NAV_H = 28;
+int languagePage = 0;
+
+void drawLanguages(const char* status = "", bool failed = false) {
+  beginScreen();
+  focusBegin(ST_LANGUAGES);
+  tft.fillScreen(C_BG);
+  tft.setTextColor(failed ? C_WARN : C_ACCENT);
+  tft.setTextDatum(TC_DATUM);
+  tft.drawString(status[0] ? status : tr(TXT_LANGUAGE), SCR_W / 2, 12, 2);
+  for (int row = 0; row < LANGUAGE_PAGE_SIZE; row++) {
+    int language = languagePage * LANGUAGE_PAGE_SIZE + row;
+    if (language >= LANGUAGE_COUNT) break;
+    String label = String(language == activeLanguage ? "* " : "") + LANGUAGE_NAMES[language];
+    btn(SETTINGS_X, LANGUAGE_Y + row * LANGUAGE_STEP, SETTINGS_W, LANGUAGE_H, label.c_str(), C_ACCENT);
+  }
+  btn(SETTINGS_X, LANGUAGE_NAV_Y, SETTINGS_PAIR_W, LANGUAGE_NAV_H, "<", C_BTN);
+  btn(SETTINGS_LANGUAGE_X, LANGUAGE_NAV_Y, SETTINGS_PAIR_W, LANGUAGE_NAV_H, ">", C_BTN);
+  btn(SETTINGS_X, SETTINGS_BACK_Y, SETTINGS_W, SETTINGS_H, tr(TXT_BACK), C_BTN);
+  focusEnd();
+}
+
+void handleLanguagesTouch(int tx, int ty) {
+  for (int row = 0; row < LANGUAGE_PAGE_SIZE; row++) {
+    if (!inBox(tx, ty, SETTINGS_X, LANGUAGE_Y + row * LANGUAGE_STEP, SETTINGS_W, LANGUAGE_H)) continue;
+    int language = languagePage * LANGUAGE_PAGE_SIZE + row;
+    if (language >= LANGUAGE_COUNT) return;
+    bool saved = setLanguage(language);
+    drawLanguages(tr(saved ? TXT_LANGUAGE_SAVED : TXT_SAVE_FAILED), !saved);
+    return;
+  }
+  if (inBox(tx, ty, SETTINGS_X, LANGUAGE_NAV_Y, SETTINGS_PAIR_W, LANGUAGE_NAV_H) ||
+      inBox(tx, ty, SETTINGS_LANGUAGE_X, LANGUAGE_NAV_Y, SETTINGS_PAIR_W, LANGUAGE_NAV_H)) {
+    languagePage = 1 - languagePage;
+    drawLanguages();
+  } else if (inBox(tx, ty, SETTINGS_X, SETTINGS_BACK_Y, SETTINGS_W, SETTINGS_H)) {
     state = ST_SETTINGS;
     drawSettings();
   }
@@ -888,7 +937,7 @@ void handleSettingsTouch(int tx, int ty) {
       tft.fillRect(0, SETTINGS_LOCK_Y + SETTINGS_H + 6, SCR_W, 16, C_BG);
       tft.setTextColor(C_WARN);
       tft.setTextDatum(TC_DATUM);
-      tft.drawString("Falha ao salvar", SCR_W / 2, SETTINGS_LOCK_Y + SETTINGS_H + 6, 2);
+      tft.drawString(tr(TXT_SAVE_FAILED), SCR_W / 2, SETTINGS_LOCK_Y + SETTINGS_H + 6, 2);
     }
   } else if (inBox(tx, ty, SETTINGS_X, SETTINGS_WIFI_Y, SETTINGS_W, SETTINGS_H)) {
     startWeb();
@@ -900,14 +949,18 @@ void handleSettingsTouch(int tx, int ty) {
   } else if (inBox(tx, ty, SETTINGS_X, SETTINGS_BRIGHT_Y, SETTINGS_EXTRA_W, SETTINGS_H)) {
     state = ST_BRIGHTNESS;
     drawBrightness();
-  } else if (inBox(tx, ty, SETTINGS_SORT_X, SETTINGS_SORT_Y, SETTINGS_EXTRA_W, SETTINGS_H)) {
+  } else if (inBox(tx, ty, SETTINGS_SORT_X, SETTINGS_SORT_Y, SETTINGS_PAIR_W, SETTINGS_H)) {
     state = ST_SORT;
     drawSort();
+  } else if (inBox(tx, ty, SETTINGS_LANGUAGE_X, SETTINGS_SORT_Y, SETTINGS_PAIR_W, SETTINGS_H)) {
+    languagePage = activeLanguage / LANGUAGE_PAGE_SIZE;
+    state = ST_LANGUAGES;
+    drawLanguages();
   } else if (inBox(tx, ty, SETTINGS_X, SETTINGS_PIN_Y, SETTINGS_W, SETTINGS_H)) {
     clearPinBuffers();
     pinLen = storagePinLen();
     state = ST_PIN_CURRENT;
-    drawPinScreen("PIN atual");
+    drawPinScreen(tr(TXT_CURRENT_PIN));
   } else if (inBox(tx, ty, SETTINGS_X, SETTINGS_BACK_Y, SETTINGS_W, SETTINGS_H)) {
     state = ST_MENU;
     drawMenu();
@@ -918,23 +971,26 @@ void handleSettingsTouch(int tx, int ty) {
 #define WEB_BTN_W  140
 #define WEB_BTN_H  42
 
+uint8_t webShownLanguage = 0;
+
 void drawWebScreen() {
+  webShownLanguage = activeLanguage;
   beginScreen();
   focusBegin(ST_WEB);
   tft.fillScreen(C_BG);
   tft.setTextColor(C_ACCENT);
   tft.setTextDatum(TC_DATUM);
-  tft.drawString("WiFi Ativo", SCR_W / 2, WEB_TITLE_Y, 4);
+  tft.drawString(tr(TXT_WIFI_ACTIVE), SCR_W / 2, WEB_TITLE_Y, 4);
 
   tft.setTextColor(C_TEXT);
   tft.setTextDatum(TC_DATUM);
   tft.drawString("SSID: " AP_SSID, SCR_W / 2, WEB_LINE_Y, 2);
-  tft.drawString(String("Senha: ") + webPass, SCR_W / 2, WEB_LINE_Y + 25, 2);
+  tft.drawString(String(tr(TXT_PASSWORD)) + ": " + webPass, SCR_W / 2, WEB_LINE_Y + 25, 2);
 
   IPAddress ip = WiFi.softAPIP();
   tft.drawString("http://" + ip.toString(), SCR_W / 2, WEB_LINE_Y + 60, 2);
 
-  btn((SCR_W - WEB_BTN_W) / 2, WEB_BTN_Y, WEB_BTN_W, WEB_BTN_H, "Desligar WiFi", C_WARN);
+  btn((SCR_W - WEB_BTN_W) / 2, WEB_BTN_Y, WEB_BTN_W, WEB_BTN_H, tr(TXT_WIFI_OFF), C_WARN);
   focusEnd();
 }
 
@@ -982,6 +1038,7 @@ void handleBack() {
     case ST_THEMES:
     case ST_BRIGHTNESS:
     case ST_SORT:
+    case ST_LANGUAGES:
       state = ST_SETTINGS;
       drawSettings();
       break;
@@ -997,7 +1054,7 @@ void lockDevice() {
   clearSearch();
   pinLen = storagePinLen();
   state = ST_PIN_ENTRY;
-  drawPinScreen("Digite PIN");
+  drawPinScreen(tr(TXT_ENTER_PIN));
 }
 
 // ===================== SETUP =====================
@@ -1030,8 +1087,8 @@ void setup() {
     tft.fillScreen(C_BG);
     tft.setTextColor(C_WARN);
     tft.setTextDatum(MC_DATUM);
-    tft.drawString("Falha no storage", SCR_W / 2, SCR_H / 2 - 12, 2);
-    tft.drawString("Reinicie o aparelho", SCR_W / 2, SCR_H / 2 + 12, 2);
+    tft.drawString(tr(TXT_STORAGE_ERROR), SCR_W / 2, SCR_H / 2 - 12, 2);
+    tft.drawString(tr(TXT_RESTART), SCR_W / 2, SCR_H / 2 + 12, 2);
     return;
   }
 
@@ -1043,11 +1100,11 @@ void setup() {
     state = ST_PIN_ENTRY;
     // Reiniciar nao pula o bloqueio: a espera recomeca do zero
     if (storageFails() >= LOCKOUT_AFTER) startLockout(storageFails());
-    else drawPinScreen("Digite PIN");
+    else drawPinScreen(tr(TXT_ENTER_PIN));
   } else {
     pinLen = PIN_LEN;
     state = ST_PIN_SETUP;
-    drawPinScreen("Criar PIN");
+    drawPinScreen(tr(TXT_CREATE_PIN));
   }
 
   lastAction = millis();
@@ -1081,10 +1138,11 @@ void loop() {
   }
   if (lockoutEnd > 0) {
     lockoutEnd = 0;
-    drawPinScreen("Digite PIN");
+    drawPinScreen(tr(TXT_ENTER_PIN));
   }
 
   webTick();
+  if (state == ST_WEB && webShownLanguage != activeLanguage) drawWebScreen();
 
   // WiFi ligado sem uso (tela e navegador): desliga o AP e bloqueia
   if (state == ST_WEB && millis() - max(lastAction, webLastRequest) > WEB_IDLE_MS) {
@@ -1093,7 +1151,7 @@ void loop() {
     return;
   }
 
-  if ((state == ST_MENU || state == ST_DETAIL || state == ST_SEARCH || state == ST_SETTINGS || state == ST_THEMES || state == ST_BRIGHTNESS || state == ST_SORT || changingPin()) && millis() - lastAction >= autoLockMs) {
+  if ((state == ST_MENU || state == ST_DETAIL || state == ST_SEARCH || state == ST_SETTINGS || state == ST_THEMES || state == ST_BRIGHTNESS || state == ST_SORT || state == ST_LANGUAGES || changingPin()) && millis() - lastAction >= autoLockMs) {
     lockDevice();
     return;
   }
@@ -1147,6 +1205,9 @@ void loop() {
       break;
     case ST_SORT:
       handleSortTouch(tx, ty);
+      break;
+    case ST_LANGUAGES:
+      handleLanguagesTouch(tx, ty);
       break;
     case ST_BRIGHTNESS:
       handleBrightnessTouch(tx, ty);

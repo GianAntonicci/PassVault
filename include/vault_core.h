@@ -8,6 +8,7 @@
 #include <mbedtls/md.h>
 #include <mbedtls/platform_util.h>
 #include "config.h"
+#include "localization.h"
 
 // ---- Credential struct ----
 enum CredentialCategory : uint8_t {
@@ -82,6 +83,15 @@ bool setBrightness(uint8_t percent) {
   if (percent == displayBrightness) return true;
   if (prefs.putUChar("brightness", percent) != sizeof(uint8_t)) return false;
   displayBrightness = percent;
+  return true;
+}
+
+// O idioma e compartilhado pela tela e web; nao integra backups de credenciais.
+bool setLanguage(uint8_t language) {
+  if (language >= LANGUAGE_COUNT) return false;
+  if (language == activeLanguage) return true;
+  if (prefs.putUChar("language", language) != sizeof(uint8_t)) return false;
+  activeLanguage = language;
   return true;
 }
 
@@ -348,6 +358,11 @@ PinChangeResult changePin(const char* pin) {
   return finishPinChange() ? PIN_CHANGE_OK : PIN_CHANGE_PENDING;
 }
 
+void loadLanguagePreference() {
+  uint8_t language = prefs.getUChar("language", 0);
+  activeLanguage = language < LANGUAGE_COUNT ? language : 0;
+}
+
 bool storageBegin() {
   storageReady = false;
   if (!prefs.begin("pv", false) || !finishPinChange()) return false;
@@ -361,6 +376,7 @@ bool storageBegin() {
                         ? brightness : BRIGHTNESS_DEFAULT;
   uint8_t mode = prefs.getUChar("sort", SORT_ALPHA);
   credentialSort = mode < SORT_COUNT ? mode : uint8_t(SORT_ALPHA);
+  loadLanguagePreference();
   storageReady = true;
   return true;
 }

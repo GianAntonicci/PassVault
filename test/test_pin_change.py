@@ -12,7 +12,7 @@ import tempfile
 root = Path(__file__).resolve().parents[1]
 source = (root / "include/vault_core.h").read_text()
 # Compile the actual transaction code, with deterministic crypto and an NVS fake.
-transaction = source[source.index("bool finishPinChange() {"):source.index("bool storageBegin() {")]
+transaction = source[source.index("bool finishPinChange() {"):source.index("void loadLanguagePreference() {")]
 wipe = source[source.index("void storageWipe() {"):source.index("// Novo salt + chave v2")]
 support = r'''
 #include <cassert>
@@ -105,6 +105,7 @@ void seed(int n, int oldLength) {
   uint8_t ver[32]; derivePinKey(oldLength == 4 ? "1234" : "123456", salt, aesKey, ver);
   prefs.putBytes("salt2", salt, 16); prefs.putBytes("pv2", ver, 32);
   prefs.putUChar("plen", oldLength); prefs.putInt("cnt", n);
+  prefs.putUChar("language", 4);
   prefs.putUChar("theme", 2); prefs.putInt("autolock", 120000);
   for (int i = 0; i < n; ++i) {
     prefs.putString(("c" + std::to_string(i)).c_str(), encryptData(("Conta" + std::to_string(i) + "|user|secret").c_str()));
@@ -121,6 +122,7 @@ void assertVault(int n, int oldLength) {
   assert(prefs.getBytes("pv2", stored, 32) == 32 && memcmp(ver, stored, 32) == 0);
   assert(prefs.getUChar("plen") == (changed ? 6 : oldLength));
   assert(prefs.getInt("cnt") == n);
+  assert(prefs.getUChar("language") == 4);
   assert(prefs.getUChar("theme") == 2 && prefs.getInt("autolock") == 120000);
   for (int i = 0; i < n; ++i) {
     auto id = std::to_string(i);

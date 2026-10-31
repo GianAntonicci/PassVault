@@ -7,7 +7,7 @@ import tempfile
 root = Path(__file__).resolve().parents[1]
 source = (root / 'src/main.cpp').read_text()
 typing = source[source.index('void typeCredential(int mode) {'):source.index('// Botoes do detalhe:')]
-layout = source[source.index('void detailBtnPos'):source.index('const char* detLabels')]
+layout = source[source.index('void detailBtnPos'):source.index('const TextId detLabels')]
 support = r'''
 #include <cassert>
 #include <algorithm>
@@ -75,7 +75,7 @@ with tempfile.TemporaryDirectory(prefix='passvault-typing-') as temp:
     for width, height in [(170, 320), (240, 280), (240, 284), (240, 240), (172, 320), (280, 456), (240, 536)]:
         cpp = Path(temp) / 'test.cpp'
         binary = Path(temp) / 'test'
-        defines = f'#define SCR_W {width}\n#define SCR_H {height}\n#include "ui_layout.h"\n'
+        defines = f'#include "localization.h"\n#define SCR_W {width}\n#define SCR_H {height}\n#include "ui_layout.h"\n'
         cpp.write_text(support + defines + typing + layout + checks)
         subprocess.run([compiler, '-std=c++17', '-Wall', '-Wextra', '-I', str(root / 'include'), str(cpp), '-o', str(binary)], check=True)
         subprocess.run([str(binary)], check=True)

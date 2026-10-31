@@ -13,6 +13,7 @@ It is a PlatformIO project with one firmware and a build environment for each su
 - **Auto-lock:** after a configurable inactivity timeout (60 s by default), the device locks and the decrypted credentials are wiped from RAM. Choose 30 s, 60 s, 2 min, 5 min or 10 min in **Config. → Auto-lock**; the choice survives a restart.
 - **Display brightness:** open **Config. → Brilho** and use **−/+** to adjust from 10% to 100% in 10% steps (default: 100%). Changes apply immediately and are saved in NVS, including across restarts. Touch and physical-button navigation are supported.
 - **Screen transitions:** a non-blocking 180 ms fade eases in each new screen and returns to your selected brightness. Redrawing the same screen does not restart the animation. Auto-lock and Wi-Fi processing remain active; taps during the fade are discarded. SPI/parallel profiles draw directly; JD9853 and QSPI profiles use a PSRAM framebuffer.
+- **Languages:** device and web UI support Portuguese (default), English, Spanish, Mandarin (Simplified Chinese), Italian, Japanese, German and Russian. Change **Config. → Idioma** on the device or **Idioma / Language** at the top of the web UI. The choice is shared, takes effect immediately and survives restarts and PIN changes.
 - **Encrypted storage:** each credential is AES-256-CBC encrypted with a random IV and stored in NVS flash.
 - **Auto-typing:** each credential offers *All* (user + TAB + password), *Login* (user only), *Password* (password only) or **Entrar** (user + TAB + password + ENTER, submitting the form).
 - **Wi-Fi management:** an on-demand Wi-Fi access point with a single-page web app to list, add, edit and delete credentials. Each time it is turned on it gets a **new random password**, accepts only one client, and shuts down after 5 minutes without use.
@@ -109,7 +110,7 @@ pio device monitor                           # optional, 115200 baud
 4. **Turn off Wi-Fi:** tap **Desligar WiFi**. The AP also turns itself off after 5 minutes without use.
 5. **Type a credential:** put the cursor in a login field on the computer, select a credential on the device and tap **Tudo** (user + TAB + password), **Login**, **Senha** or **Entrar** (user + TAB + password + ENTER).
 
-> The on-screen UI is in Portuguese: *Tudo* = All, *Login* = Login, *Senha* = Password, *Voltar* = Back, *Bloquear* = Lock, *Desligar WiFi* = Turn off Wi-Fi.
+> The default UI language is Portuguese; select another language in **Config. → Idioma** or the web language selector. In Portuguese: *Tudo* = All, *Login* = Login, *Senha* = Password, *Voltar* = Back, *Bloquear* = Lock, *Desligar WiFi* = Turn off Wi-Fi.
 
 > The host keyboard layout should be **US**, because HID sends US key codes. With another layout, symbols in passwords may come out wrong.
 
@@ -328,6 +329,7 @@ Settings ──► Auto-lock (cycle timeout) / Ativar WiFi ──► Wi-Fi AP
 - **PIN screens:** a numpad with digits, `C` (clear) and `<` (backspace).
 - **Menu:** a scrollable credential list (swipe on the touch board, or button navigation) plus *Config.* (Settings) and *Bloquear* (Lock) buttons. The top-right corner shows `USB`.
 - **Settings:** press *Auto-lock* to cycle through 30 s, 60 s, 2 min, 5 min and 10 min. Each change takes effect immediately and is saved in NVS. *Ativar WiFi* opens the Wi-Fi screen; *Voltar* returns to the menu. Physical-button boards use the same focus navigation as other screens. The Wi-Fi screen keeps its separate 5-minute idle timeout.
+- **Language:** open **Config. → Idioma**. Four native language names appear per page; use **< / >** to reach the other four. Tap a language to save it; **Voltar** returns to settings. Physical-button focus and auto-lock remain active. The language selector shares the last settings row with sorting. Changing the language in the web UI also refreshes the active Wi-Fi screen, without restarting the access point. Browser form values and stored credentials remain unchanged. This device preference is excluded from credential backups.
 - **Detail:** shows the name and username with the password masked, plus the *Tudo / Login / Senha / Entrar / Voltar* buttons.
 - **Typing feedback:** *Tudo*, *Login*, *Senha* and *Entrar* show **Digitando...** during USB transmission, followed by **Envio finalizado** for 0.9 s before returning to the detail screen. Credential contents stay hidden during this feedback.
 - **Themes:** open **Config. → Temas** on the device and select **Cyber Green**, **Azul**, **Roxo** or **Ambar**. The palette changes immediately across the display, including the PIN screen. An asterisk marks the active theme, and the choice survives a restart. Touch and physical-button navigation are supported; auto-lock remains active in this tab.
@@ -341,9 +343,13 @@ Run `python3 test/test_credential_typing.py` to check the keyboard sequences, di
 
 Run `python3 test/test_credential_sort.py` to check sorting, favorites, usage persistence, legacy records, deletion, stable IDs, types, grouping, write failures and backup v1/v2/v3 compatibility with simulated storage and mocked crypto.
 
-Run `node test/test_web_categories.js` to check web grouping, colored labels, type editing, escaping, save failures and backup version support with simulated DOM and API responses.
+Run `node test/test_web_categories.js` to check all eight web languages, live labels/placeholders, preservation of in-progress forms, language-save failure rollback, grouping, type editing, escaping and backup compatibility with simulated DOM and API responses.
 
-Run `python3 test/test_pin_change.py` to exercise the production transaction code on the host with simulated NVS write failures and power cuts. The test covers empty/full vaults, legacy PIN lengths, favorites/settings preservation and repeated recovery interruptions. Cryptography is mocked in this host test; hardware power-loss and USB/touch behavior still require device validation.
+Run `python3 test/test_localization.py` to check language persistence and API validation, all translated glyphs, malformed UTF-8 handling and language control bounds on every supported display size. The test also renders font samples to `/tmp/passvault-languages-<width>x<height>.pgm` for inspection. Run `python3 scripts/generate_localization.py --check` to verify the generated catalogs and font subset. Edit `locales/translations.json` and regenerate with `python3 scripts/generate_localization.py` when changing translations.
+
+The device embeds a small Unicode bitmap font containing the characters used by the translations, including Simplified Chinese, Japanese and Cyrillic. It requires no filesystem upload, external font or internet connection. Unsupported characters in user-entered credentials render as `?` on the device without changing stored data. USB HID remains ASCII-only and the search keyboard remains A–Z/0–9. Font provenance and its separate SIL OFL 1.1 license are documented in [assets/fonts/README.md](assets/fonts/README.md). Physical display/touch/button validation is still required.
+
+Run `python3 test/test_pin_change.py` to exercise the production transaction code on the host with simulated NVS write failures and power cuts. The test covers empty/full vaults, legacy PIN lengths, favorites/categories/language/settings preservation and repeated recovery interruptions. Cryptography is mocked in this host test; hardware power-loss and USB/touch behavior still require device validation.
 - **Wi-Fi:** shows the SSID, password and URL of the access point.
 
 ### Security model
@@ -433,6 +439,8 @@ const char* kbdLabel();
 |---|---|---|
 | GET | `/` | Single-page web app |
 | GET | `/api/list` | List credentials with numeric `category` in the selected order (storage IDs preserved) |
+| GET | `/api/language` | Get the selected language (`language`, `code`), native language names and the selected translation catalog |
+| POST | `/api/language` | Save `language`: `0` Portuguese, `1` English, `2` Spanish, `3` Simplified Chinese, `4` Italian, `5` Japanese, `6` German, `7` Russian; return the selected catalog |
 | GET | `/api/sort` | Get sorting preference (`mode`) |
 | POST | `/api/sort` | Save sorting preference (`mode`: `0` alphabetical, `1` newest, `2` most used, `3` grouped by type) |
 | GET | `/api/get` | Get one credential, including numeric `category` |
