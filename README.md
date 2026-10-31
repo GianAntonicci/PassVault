@@ -14,12 +14,12 @@ It is a PlatformIO project with one firmware and a build environment for each su
 - **Display brightness:** open **Config. → Brilho** and use **−/+** to adjust from 10% to 100% in 10% steps (default: 100%). Changes apply immediately and are saved in NVS, including across restarts. Touch and physical-button navigation are supported. On generic displays, the backlight must be connected to the configured `TFT_BL` pin through a PWM-capable backlight circuit.
 - **Screen transitions:** a non-blocking 180 ms fade eases in each new screen and returns to your selected brightness. Redrawing the same screen does not restart the animation. Auto-lock and Wi-Fi processing remain active; taps during the fade are discarded. No full-screen framebuffer is needed. Generic displays require the same PWM backlight wiring as brightness adjustment.
 - **Encrypted storage:** each credential is AES-256-CBC encrypted with a random IV and stored in NVS flash.
-- **Auto-typing:** each credential offers *All* (user + TAB + password), *Login* (user only) or *Password* (password only).
+- **Auto-typing:** each credential offers *All* (user + TAB + password), *Login* (user only), *Password* (password only) or **Entrar** (user + TAB + password + ENTER, submitting the form).
 - **Wi-Fi management:** an on-demand Wi-Fi access point with a single-page web app to list, add, edit and delete credentials. Each time it is turned on it gets a **new random password**, accepts only one client, and shuts down after 5 minutes without use.
 - **Search by name:** filter the menu list with an on-screen A–Z/0–9 keyboard. Matching ignores case and finds the text anywhere in the name.
 - **Password generator:** the web UI creates random passwords with a chosen length and character types.
 - **Favorites:** mark frequently used credentials with **Favoritar** on the device or web detail screen. Favorites appear first, including in search results, and survive locking and rebooting. Use **Desmarcar** to remove the mark.
-- **Credential sorting:** select **Config. → Ordenar** on the device or **Ordenar por** in the web UI. Choose **Alfabética** (default, ignores letter case), **Mais recente** (newest registrations first; edits keep their original position) or **Mais usada** (highest keyboard-send count first, with alphabetical ties). Favorites stay first in every mode, including search results. The same preference applies to the device and web list and survives restarts. Each completed *All/Login/Password* send while the keyboard remains connected counts once; viewing a credential does not count. Existing credentials start with zero uses. Usage counters remain on the device and are reset for imported credentials; backups retain their existing format and do not include the sorting preference or usage history.
+- **Credential sorting:** select **Config. → Ordenar** on the device or **Ordenar por** in the web UI. Choose **Alfabética** (default, ignores letter case), **Mais recente** (newest registrations first; edits keep their original position) or **Mais usada** (highest keyboard-send count first, with alphabetical ties). Favorites stay first in every mode, including search results. The same preference applies to the device and web list and survives restarts. Each completed *All/Login/Password/Entrar* send while the keyboard remains connected counts once; viewing a credential does not count. Existing credentials start with zero uses. Usage counters remain on the device and are reset for imported credentials; backups retain their existing format and do not include the sorting preference or usage history.
 - **Encrypted backup:** export all credentials to a JSON file protected by a backup password, and import them again on the same or another device.
 - **Up to 30 credentials:** name ≤ 32 chars, user ≤ 64, password ≤ 64.
 - **Several boards:** portrait and landscape layouts, capacitive, resistive or button-only input, and a USB or BLE keyboard.
@@ -110,7 +110,7 @@ pio device monitor                           # optional, 115200 baud
 2. **Turn on Wi-Fi:** tap **Config. → Ativar WiFi**. The screen shows the network `PassVault`, a **random password** and the URL (normally `http://192.168.4.1`).
 3. **Add credentials:** connect your phone or laptop to that network, open the URL and add your credentials.
 4. **Turn off Wi-Fi:** tap **Desligar WiFi**. The AP also turns itself off after 5 minutes without use.
-5. **Type a credential:** put the cursor in a login field on the computer, select a credential on the device and tap **Tudo** (user + TAB + password), **Login** or **Senha**.
+5. **Type a credential:** put the cursor in a login field on the computer, select a credential on the device and tap **Tudo** (user + TAB + password), **Login**, **Senha** or **Entrar** (user + TAB + password + ENTER).
 
 > The on-screen UI is in Portuguese: *Tudo* = All, *Login* = Login, *Senha* = Password, *Voltar* = Back, *Bloquear* = Lock, *Desligar WiFi* = Turn off Wi-Fi.
 
@@ -180,20 +180,21 @@ Matching ignores case and finds the text anywhere in the name, so `MAIL` matches
 
 ### Typing a credential
 
-1. On the computer, **click the field** where the text should go. For *Tudo*, click the username field.
+1. On the computer, **click the field** where the text should go. For *Tudo* or *Entrar*, click the username field.
 2. On the device, select the credential in the menu to open its detail screen. It shows the name and username, with the password masked.
 3. Choose what to type:
 
 | Button | Types | Typical use |
 |---|---|---|
 | **Tudo** | username, **TAB**, password | Login forms where TAB moves to the password field |
+| **Entrar** | username, **TAB**, password, **ENTER** | Fill and submit a login form in one action |
 | **Login** | username only | Two-step logins (username first, then the next page) |
 | **Senha** | password only | Password-only prompts, or the second step of a two-step login |
 | **Voltar** | — | Back to the menu |
 
 Use **Revelar** on the detail screen to display the password for **3 seconds**. It is then masked automatically; pressing the button again restarts the timer. Leaving the screen also hides the password. Long passwords wrap to fit the display.
 
-The device does **not** press Enter, so you submit the form yourself. This avoids sending a password to the wrong window by accident.
+**Entrar** appends Enter to submit the form. **Tudo**, **Login** and **Senha** do not append Enter; submit manually after using those options.
 
 **BLE boards:** typing only works while the `BLE` label in the menu is **green** (a host is connected). When it is grey, nothing is sent.
 
@@ -333,12 +334,14 @@ Settings ──► Auto-lock (cycle timeout) / Ativar WiFi ──► Wi-Fi AP
 - **PIN screens:** a numpad with digits, `C` (clear) and `<` (backspace).
 - **Menu:** a scrollable credential list (swipe on the touch board, or button navigation) plus *Config.* (Settings) and *Bloquear* (Lock) buttons. The top-right corner shows `USB` or `BLE`. For BLE it is green only while a host is paired.
 - **Settings:** press *Auto-lock* to cycle through 30 s, 60 s, 2 min, 5 min and 10 min. Each change takes effect immediately and is saved in NVS. *Ativar WiFi* opens the Wi-Fi screen; *Voltar* returns to the menu. Physical-button boards use the same focus navigation as other screens. The Wi-Fi screen keeps its separate 5-minute idle timeout.
-- **Detail:** shows the name and username with the password masked, plus the *Tudo / Login / Senha / Voltar* buttons.
-- **Typing feedback:** *Tudo*, *Login* and *Senha* show **Digitando...** during USB/BLE transmission, followed by **Envio finalizado** for 0.9 s before returning to the detail screen. Credential contents stay hidden during this feedback.
+- **Detail:** shows the name and username with the password masked, plus the *Tudo / Login / Senha / Entrar / Voltar* buttons.
+- **Typing feedback:** *Tudo*, *Login*, *Senha* and *Entrar* show **Digitando...** during USB/BLE transmission, followed by **Envio finalizado** for 0.9 s before returning to the detail screen. Credential contents stay hidden during this feedback.
 - **Themes:** open **Config. → Temas** on the device and select **Cyber Green**, **Azul**, **Roxo** or **Ambar**. The palette changes immediately across the display, including the PIN screen. An asterisk marks the active theme, and the choice survives a restart. Touch and physical-button navigation are supported; auto-lock remains active in this tab.
 - **Change unlock PIN:** open **Config. → Alterar PIN**, enter the current PIN, then enter and confirm a new 6-digit PIN. Legacy 4-digit PINs are accepted as the current PIN. On success the device locks; unlock with the new PIN. Credentials, favorites and settings are preserved. *Cancelar* (or holding Back on button boards) cancels without changing the PIN, and auto-lock remains active throughout the flow. An incorrect current PIN ends the unlocked session and counts toward the existing lockout/wipe limits.
 
 PIN changes first re-encrypt the stored credentials with a fresh salt into the temporary NVS namespace `pvnext`. Only after every staging write succeeds is the `pinchange` marker committed. Startup replays committed changes before accepting PIN input; interrupted staging leaves the old PIN active. If NVS lacks room for the temporary copy, the change fails and the old PIN remains valid. If committed recovery cannot complete, the display asks for a restart and keeps the vault inaccessible until recovery succeeds.
+
+Run `python3 test/test_credential_typing.py` to check the keyboard sequences, disconnected-host behavior, usage counting and button bounds for all display layouts.
 
 Run `python3 test/test_credential_sort.py` to check sorting, favorites, usage persistence, legacy records, deletion, stable IDs and write failures with simulated storage.
 

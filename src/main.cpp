@@ -705,15 +705,16 @@ void typeCredential(int mode) {
   }
 
   drawTypingFeedback("Digitando...", C_ACCENT);
-  if (mode == 0 || mode == 1) {
+  if (mode == 0 || mode == 1 || mode == 3) {
     kbdPrint(creds[selCred].user);
-    if (mode == 0) {
+    if (mode == 0 || mode == 3) {
       kbdWrite(KEY_TAB);
     }
   }
-  if (mode == 0 || mode == 2) {
+  if (mode == 0 || mode == 2 || mode == 3) {
     kbdPrint(creds[selCred].pass);
   }
+  if (mode == 3) kbdWrite(KEY_RETURN);
   if (kbdConnected()) recordCredentialUse(selCred);
   drawTypingFeedback(kbdConnected() ? "Envio finalizado" : "Teclado desconectado",
                      kbdConnected() ? C_OK : C_WARN);
@@ -722,38 +723,35 @@ void typeCredential(int mode) {
   lastAction = millis();
 }
 
-// Botoes do detalhe: 0=Tudo 1=Login 2=Senha 3=Voltar 4=Revelar 5=Favoritar
-// Revelar: abaixo da grade no portrait, acima do rodape no landscape.
-#define DET_BTN_COUNT 6
-#define DET_BTN_H  38
+// Botoes do detalhe: 0=Tudo 1=Login 2=Senha 3=Voltar 4=Revelar 5=Favoritar 6=Entrar
+// Entrar envia login + Tab + senha + Enter (modo 3).
+#define DET_BTN_COUNT 7
 #define DET_GAP    8
 #ifdef USE_LANDSCAPE
+  #define DET_BTN_H  38
   #define DET_BTN_W  ((SCR_W - 5 * DET_GAP) / 4)
 #else
+  #define DET_BTN_H  34
   #define DET_BTN_W  75
 #endif
 
 void detailBtnPos(int i, int &x, int &y) {
+#ifdef USE_LANDSCAPE
   if (i >= 4) {
-    x = (SCR_W - 2 * DET_BTN_W - DET_GAP) / 2 + (i - 4) * (DET_BTN_W + DET_GAP);
-#ifdef USE_LANDSCAPE
+    x = (SCR_W - 3 * DET_BTN_W - 2 * DET_GAP) / 2 + (i - 4) * (DET_BTN_W + DET_GAP);
     y = 150;
-#else
-    y = 262;
-#endif
-    return;
+  } else {
+    x = DET_GAP + i * (DET_BTN_W + DET_GAP);
+    y = SCR_H - DET_BTN_H - 6;
   }
-#ifdef USE_LANDSCAPE
-  x = DET_GAP + i * (DET_BTN_W + DET_GAP);
-  y = SCR_H - DET_BTN_H - 6;
 #else
   int x1 = (SCR_W - 2 * DET_BTN_W - DET_GAP) / 2;
-  x = x1 + (i % 2) * (DET_BTN_W + DET_GAP);
-  y = 170 + (i / 2) * (DET_BTN_H + DET_GAP);
+  x = i == 6 ? (SCR_W - DET_BTN_W) / 2 : x1 + (i % 2) * (DET_BTN_W + DET_GAP);
+  y = 154 + (i / 2) * (DET_BTN_H + DET_GAP);
 #endif
 }
 
-const char* detLabels[DET_BTN_COUNT] = {"Tudo", "Login", "Senha", "Voltar", "Revelar", "Favoritar"};
+const char* detLabels[DET_BTN_COUNT] = {"Tudo", "Login", "Senha", "Voltar", "Revelar", "Favoritar", "Entrar"};
 
 void drawDetailPassword() {
   // Fonte de 6x8: ate 64 caracteres cabem em 3 linhas no portrait.
@@ -770,7 +768,7 @@ void drawDetailPassword() {
 
 void drawDetail() {
   beginScreen();
-  const uint16_t detColors[DET_BTN_COUNT] = {C_OK, C_ACCENT, C_ACCENT, C_DIM, C_ACCENT, C_WARN};
+  const uint16_t detColors[DET_BTN_COUNT] = {C_OK, C_ACCENT, C_ACCENT, C_DIM, C_ACCENT, C_WARN, C_OK};
   typingFeedbackVisible = false;
   detailPasswordVisible = false;
   focusBegin(ST_DETAIL);
@@ -805,6 +803,8 @@ void handleDetailTouch(int tx, int ty) {
     if (!inBox(tx, ty, x, y, DET_BTN_W, DET_BTN_H)) continue;
     if (i < 3) {
       typeCredential(i);
+    } else if (i == 6) {
+      typeCredential(3);
     } else if (i == 5) {
       setCredentialFavorite(selCred, !creds[selCred].favorite);
       menuTop = 0;
