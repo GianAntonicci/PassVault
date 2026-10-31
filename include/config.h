@@ -32,8 +32,97 @@
   #define TOUCH_DEBOUNCE  0    // botoes ja tem debounce proprio em input.h
   #define KBD_USB_HID
 
+#elif defined(BOARD_WAVESHARE_S3_TOUCH_169)
+  #define BOARD_NAME      "Waveshare S3 Touch 1.69"
+  #define SCR_W           240
+  #define SCR_H           280
+  #define TFT_ROTATION    0
+  #define PIN_POWER_ON    41  // SYS_EN: hold battery power on
+  #define TOUCH_SDA       11
+  #define TOUCH_SCL       10
+  #define TOUCH_RST       13
+  #define TOUCH_INT       14
+  #define TOUCH_DEBOUNCE  100
+  #define INPUT_CST816_POLL
+  #define KBD_USB_HID
+
+#elif defined(BOARD_WAVESHARE_S3_TOUCH_183)
+  #define BOARD_NAME      "Waveshare S3 Touch 1.83"
+  #define SCR_W           240
+  #define SCR_H           284
+  #define TFT_ROTATION    0
+  #define PIN_POWER_ON    -1
+  #define TOUCH_SDA       15
+  #define TOUCH_SCL       14
+  #define TOUCH_RST       39
+  #define TOUCH_INT       13
+  #define TOUCH_DEBOUNCE  100
+  #define INPUT_CST816_POLL
+  #define KBD_USB_HID
+
+#elif defined(BOARD_WAVESHARE_S3_TOUCH_154)
+  #define BOARD_NAME         "Waveshare S3 Touch 1.54"
+  #define SCR_W              240
+  #define SCR_H              240
+  #define TFT_ROTATION       0
+  #define PIN_POWER_ON       -1
+  #define TOUCH_SDA          42
+  #define TOUCH_SCL          41
+  #define TOUCH_RST          47
+  #define TOUCH_INT          48
+  #define TOUCH_DEBOUNCE     100
+  #define INPUT_CST816_POLL
+  #define KBD_USB_HID
+
+#elif defined(BOARD_WAVESHARE_S3_TOUCH_147)
+  #define BOARD_NAME         "Waveshare S3 Touch 1.47"
+  #define SCR_W              172
+  #define SCR_H              320
+  #define TFT_ROTATION       0
+  #define PIN_POWER_ON       -1
+  #define TOUCH_SDA          42
+  #define TOUCH_SCL          41
+  #define TOUCH_RST          47
+  #define TOUCH_INT          48
+  #define TOUCH_DEBOUNCE     100
+  #define INPUT_AXS5106_POLL
+  #define KBD_USB_HID
+  #define DISPLAY_GFX
+
+#elif defined(BOARD_WAVESHARE_S3_AMOLED_164)
+  #define BOARD_NAME         "Waveshare AMOLED 1.64 V1.1"
+  #define SCR_W              280
+  #define SCR_H              456
+  #define TFT_ROTATION       0
+  #define PIN_POWER_ON       -1
+  #define TOUCH_SDA          47
+  #define TOUCH_SCL          48
+  #define TOUCH_RST          -1
+  #define TOUCH_INT          18
+  #define TOUCH_DEBOUNCE     100
+  #define INPUT_FT3168_POLL
+  #define KBD_USB_HID
+  #define DISPLAY_GFX
+  #define DISPLAY_AMOLED
+
+#elif defined(BOARD_TDISPLAY_S3_AMOLED_TOUCH)
+  #define BOARD_NAME         "T-Display S3 AMOLED Touch"
+  #define SCR_W              240
+  #define SCR_H              536
+  #define TFT_ROTATION       0
+  #define PIN_POWER_ON       38
+  #define TOUCH_SDA          3
+  #define TOUCH_SCL          2
+  #define TOUCH_RST          -1
+  #define TOUCH_INT          21
+  #define TOUCH_DEBOUNCE     100
+  #define INPUT_CST816_POLL
+  #define KBD_USB_HID
+  #define DISPLAY_GFX
+  #define DISPLAY_AMOLED
+
 #else
-  #error "Defina uma placa: -DBOARD_TDISPLAY_S3_TOUCH, -DBOARD_TDISPLAY_S3"
+  #error "Select a supported BOARD_* profile in platformio.ini."
 #endif
 
 // =====================================================================

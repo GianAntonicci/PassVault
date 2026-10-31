@@ -6,11 +6,12 @@
  */
 
 #include <Arduino.h>
-#include <TFT_eSPI.h>
+#include "display.h"
 #include "config.h"
+#include "ui_layout.h"
 
 // ---- Objects ----
-TFT_eSPI tft = TFT_eSPI();
+VaultDisplay tft;
 
 #include "input.h"
 #include "keyboard.h"
@@ -28,7 +29,7 @@ ScreenFade screenFade;
 void applyBrightness() {
   int duty = (displayBrightness * 255 + 50) / 100;
   duty = (duty * screenFade.level + 127) / 255;
-  analogWrite(TFT_BL, TFT_BACKLIGHT_ON == HIGH ? duty : 255 - duty);
+  tft.brightness(duty);
 }
 
 void beginScreen() {
@@ -62,20 +63,6 @@ int  filtCount = 0;
 unsigned long lockoutEnd = 0;
 unsigned long lockoutTick = 0;
 unsigned long lastAction = 0;
-
-// ---- Layout: portrait 170x320 (T-Display S3 / Touch) ----
-  #define PIN_TITLE_Y   20
-  #define PIN_MSG_Y     60
-  #define PIN_BOX_Y     95
-  #define PIN_BOX_H     32
-  #define NP_BW         48
-  #define NP_BH         32
-  #define NP_Y0         140
-  #define WEB_TITLE_Y   30
-  #define WEB_LINE_Y    80
-  #define WEB_BTN_Y     200
-// Aviso de PIN incorreto abaixo da instrucao
-  #define PIN_WARN_Y    75
 
 // ---- Forward declarations ----
 void drawMenu();
@@ -112,10 +99,6 @@ void btn(int x, int y, int w, int h, const char* label, uint16_t bg) {
 }
 
 // ---- Numpad ----
-#define NP_GAP  4
-#define NP_COLS  3
-#define NP_ROWS  4
-
 const char* npLabels[12] = {"1","2","3","4","5","6","7","8","9","C","0","<"};
 
 int npX0() { return (SCR_W - (NP_COLS * NP_BW + (NP_COLS - 1) * NP_GAP)) / 2; }
@@ -182,7 +165,7 @@ void drawPinScreen(const char* title) {
   drawPinBoxes();
   drawNumpad();
   if (changingPin()) {
-    btn(10, 286, SCR_W - 20, 28, "Cancelar", C_BTN);
+    btn(10, PIN_CANCEL_Y, SCR_W - 20, PIN_CANCEL_H, "Cancelar", C_BTN);
   }
   focusEnd();
 }
@@ -255,6 +238,7 @@ void wipeVault() {
   tft.setTextDatum(MC_DATUM);
   tft.drawString("VAULT", SCR_W / 2, SCR_H / 2 - 20, 4);
   tft.drawString("APAGADO", SCR_W / 2, SCR_H / 2 + 10, 4);
+  tft.present();
   delay(4000);
   ESP.restart();
 }
@@ -264,11 +248,12 @@ void drawBusy(const char* msg) {
   tft.setTextColor(C_ACCENT);
   tft.setTextDatum(TC_DATUM);
   tft.drawString(msg, SCR_W / 2, PIN_WARN_Y, 2);
+  tft.present();
 }
 
 void handlePinTouch(int tx, int ty) {
   if (changingPin()) {
-    bool cancel = inBox(tx, ty, 10, 286, SCR_W - 20, 28);
+    bool cancel = inBox(tx, ty, 10, PIN_CANCEL_Y, SCR_W - 20, PIN_CANCEL_H);
     if (cancel) { cancelPinChange(); return; }
   }
   int key = hitNumpad(tx, ty);
@@ -553,17 +538,6 @@ void handleMenuTouch(int tx, int ty, int gesture) {
 
 // ---- Busca (teclado na tela) ----
 // 36 teclas A-Z/0-9 + linha de acoes: 0=apagar 1=limpar 2=OK
-  #define KB_COLS  6
-  #define KB_KH    28
-  #define KB_Y0    74
-#define KB_GAP   3
-#define KB_KEYS  36
-#define KB_KW    ((SCR_W - 8 - (KB_COLS - 1) * KB_GAP) / KB_COLS)
-#define KB_X0    ((SCR_W - (KB_COLS * KB_KW + (KB_COLS - 1) * KB_GAP)) / 2)
-#define KB_ACT_H 34
-#define KB_ACT_Y (SCR_H - KB_ACT_H - 6)
-#define KB_ACT_W ((SCR_W - 8 - 2 * KB_GAP) / 3)
-
 const char kbChars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 const char* kbActLabels[3] = {"<", "Limpar", "OK"};
 const uint16_t kbActColors[3] = {C_WARN, C_WARN, C_OK};
@@ -647,6 +621,7 @@ void drawTypingFeedback(const char* message, uint16_t color) {
   tft.drawString(message, SCR_W / 2, SCR_H / 2 - 10, 2);
   tft.setTextColor(C_DIM, C_BG);
   tft.drawString(kbdLabel(), SCR_W / 2, SCR_H / 2 + 16, 2);
+  tft.present();
 }
 
 void typeCredential(int mode) {
@@ -678,15 +653,12 @@ void typeCredential(int mode) {
 
 // Botoes do detalhe: 0=Tudo 1=Login 2=Senha 3=Voltar 4=Revelar 5=Favoritar 6=Entrar
 // Entrar envia login + Tab + senha + Enter (modo 3).
-#define DET_BTN_COUNT 7
-#define DET_GAP    8
-  #define DET_BTN_H  34
-  #define DET_BTN_W  75
-
 void detailBtnPos(int i, int &x, int &y) {
-  int x1 = (SCR_W - 2 * DET_BTN_W - DET_GAP) / 2;
-  x = i == 6 ? (SCR_W - DET_BTN_W) / 2 : x1 + (i % 2) * (DET_BTN_W + DET_GAP);
-  y = 154 + (i / 2) * (DET_BTN_H + DET_GAP);
+  int columns = DET_COLS;
+  int rowCount = min(columns, DET_BTN_COUNT - (i / columns) * columns);
+  int x1 = (SCR_W - rowCount * DET_BTN_W - (rowCount - 1) * DET_GAP) / 2;
+  x = x1 + (i % columns) * (DET_BTN_W + DET_GAP);
+  y = DET_Y0 + (i / columns) * (DET_BTN_H + DET_GAP);
 }
 
 const char* detLabels[DET_BTN_COUNT] = {"Tudo", "Login", "Senha", "Voltar", "Revelar", "Favoritar", "Entrar"};
@@ -694,13 +666,13 @@ const char* detLabels[DET_BTN_COUNT] = {"Tudo", "Login", "Senha", "Voltar", "Rev
 void drawDetailPassword() {
   // Fonte de 6x8: ate 64 caracteres cabem em 3 linhas no portrait.
   // Limpa toda a area para remover tambem as linhas da senha revelada.
-  tft.fillRect(0, 120, SCR_W, 24, C_BG);
+  tft.fillRect(0, DET_PASS_Y, SCR_W, 24, C_BG);
   tft.setTextColor(C_TEXT, C_BG);
   const int cols = (SCR_W - 20) / 6;
   const char* pass = creds[selCred].pass;
   for (int i = 0; pass[i] && i < 64; i++) {
     tft.drawChar(detailPasswordVisible ? pass[i] : '*',
-                 10 + (i % cols) * 6, 120 + (i / cols) * 8, 1);
+                 10 + (i % cols) * 6, DET_PASS_Y + (i / cols) * 8, 1);
   }
 }
 
@@ -717,12 +689,12 @@ void drawDetail() {
 
   tft.setTextColor(C_DIM);
   tft.setTextDatum(TL_DATUM);
-  tft.drawString("Usuario:", 10, 50, 2);
+  tft.drawString("Usuario:", 10, DET_USER_LABEL_Y, 2);
   tft.setTextColor(C_TEXT);
-  tft.drawString(creds[selCred].user, 10, 70, 2);
+  tft.drawString(creds[selCred].user, 10, DET_USER_Y, 2);
 
   tft.setTextColor(C_DIM);
-  tft.drawString("Senha:", 10, 100, 2);
+  tft.drawString("Senha:", 10, DET_PASS_LABEL_Y, 2);
   drawDetailPassword();
 
   for (int i = 0; i < DET_BTN_COUNT; i++) {
@@ -760,19 +732,6 @@ void handleDetailTouch(int tx, int ty) {
 }
 
 // ---- Configuracoes ----
-#define SETTINGS_X       10
-#define SETTINGS_W       (SCR_W - 20)
-#define SETTINGS_H       30
-#define SETTINGS_LOCK_Y  38
-#define SETTINGS_WIFI_Y  96
-#define SETTINGS_THEME_Y 130
-#define SETTINGS_PIN_Y   164
-#define SETTINGS_BRIGHT_Y 198
-  #define SETTINGS_EXTRA_W SETTINGS_W
-  #define SETTINGS_SORT_X SETTINGS_X
-  #define SETTINGS_SORT_Y 232
-#define SETTINGS_BACK_Y  (SCR_H - SETTINGS_H - 8)
-
 void drawSettings() {
   beginScreen();
   focusBegin(ST_SETTINGS);
@@ -1036,15 +995,22 @@ void lockDevice() {
 
 // ===================== SETUP =====================
 void setup() {
+  DisplayFrame frame;
 #if PIN_POWER_ON >= 0
   pinMode(PIN_POWER_ON, OUTPUT);
   digitalWrite(PIN_POWER_ON, HIGH);
 #endif
 
+#if TFT_BL >= 0
   pinMode(TFT_BL, OUTPUT);
   digitalWrite(TFT_BL, TFT_BACKLIGHT_ON);
+#endif
 
-  tft.init();
+  if (!tft.init()) {
+    Serial.begin(115200);
+    Serial.println("Display initialization failed");
+    return;
+  }
   tft.setRotation(TFT_ROTATION);
   tft.fillScreen(TFT_BLACK);
 
@@ -1082,6 +1048,7 @@ void setup() {
 
 // ===================== LOOP =====================
 void loop() {
+  DisplayFrame frame;
   if (!storageReady) return;
   if (screenFade.tick(millis())) applyBrightness();
   // Mantem a confirmacao visivel sem bloquear o loop ou o auto-lock.
