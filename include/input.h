@@ -21,10 +21,10 @@
 // =====================================================================
 
 #include <Arduino.h>
-#include <TFT_eSPI.h>
+#include "display.h"
 #include "config.h"
 
-extern TFT_eSPI tft;
+extern VaultDisplay tft;
 
 #define GESTURE_NONE        0
 #define GESTURE_SWIPE_DOWN  1
@@ -51,6 +51,84 @@ bool inputRead(int &x, int &y, int &gesture) {
   y = touch.data.y;
   gesture = touch.data.gestureID;
   return true;
+}
+
+// ---------------------------------------------------------------------
+#elif defined(INPUT_CST816_POLL) || defined(INPUT_FT3168_POLL) || defined(INPUT_AXS5106_POLL)
+// Capacitive controllers: decode finger state and emit tap/swipe on release.
+#include <Wire.h>
+#include "touch_gesture.h"
+
+TouchGesture touchGesture;
+
+void inputBegin() {
+  Wire.begin(TOUCH_SDA, TOUCH_SCL);
+  Wire.setTimeOut(20);
+#if TOUCH_RST >= 0
+  pinMode(TOUCH_RST, OUTPUT);
+  digitalWrite(TOUCH_RST, HIGH);
+  delay(50);
+  digitalWrite(TOUCH_RST, LOW);
+#ifdef INPUT_AXS5106_POLL
+  delay(200);
+#else
+  delay(10);
+#endif
+  digitalWrite(TOUCH_RST, HIGH);
+#ifdef INPUT_AXS5106_POLL
+  delay(300);
+#else
+  delay(200);
+#endif
+#endif
+#ifdef INPUT_CST816_POLL
+  // Disable auto-sleep so finger-state polling also works after long idle times.
+  Wire.beginTransmission(0x15);
+  Wire.write(0xFE);
+  Wire.write(0x01);
+  Wire.endTransmission();
+#elif defined(INPUT_FT3168_POLL)
+  Wire.beginTransmission(0x38);
+  Wire.write(0x00);
+  Wire.write(0x00); // Normal mode.
+  Wire.endTransmission();
+#endif
+}
+
+bool inputRead(int &x, int &y, int &gesture) {
+  static unsigned long lastPoll = 0;
+  if (millis() - lastPoll < 10) return false;
+  lastPoll = millis();
+#if defined(INPUT_AXS5106_POLL)
+  constexpr uint8_t address = 0x63, reg = 0x01, count = 6;
+#elif defined(INPUT_FT3168_POLL)
+  constexpr uint8_t address = 0x38, reg = 0x02, count = 5;
+#else
+  constexpr uint8_t address = 0x15, reg = 0x02, count = 5;
+#endif
+  Wire.beginTransmission(address);
+  Wire.write(reg);
+  if (Wire.endTransmission(false) != 0) return false;
+  if (Wire.requestFrom(address, count) != count) return false;
+#ifdef INPUT_AXS5106_POLL
+  Wire.read(); // Gesture byte precedes the point count.
+#endif
+  uint8_t points = Wire.read() & 0x0F;
+  int px = (Wire.read() & 0x0F) << 8;
+  px |= Wire.read();
+  int py = (Wire.read() & 0x0F) << 8;
+  py |= Wire.read();
+#ifdef BOARD_TDISPLAY_S3_AMOLED_TOUCH
+  int rawX = px;
+  px = SCR_W - 1 - py;
+  py = rawX; // CST816 reports landscape coordinates on the 1.91-inch panel.
+#endif
+#ifdef INPUT_AXS5106_POLL
+  px = SCR_W - 1 - px; // Manufacturer's portrait rotation 0 transform.
+#endif
+  // Ignore malformed samples rather than generating a false release.
+  if (points && (px < 0 || py < 0 || px >= SCR_W || py >= SCR_H)) return false;
+  return touchGesture.sample(points != 0, px, py, x, y, gesture);
 }
 
 // ---------------------------------------------------------------------

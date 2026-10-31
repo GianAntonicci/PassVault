@@ -17,6 +17,9 @@ int writtenDuty = -1;
 #define TFT_BL 38
 #define TFT_BACKLIGHT_ON BACKLIGHT_POLARITY
 void analogWrite(int pin, int duty) { assert(pin == TFT_BL); writtenDuty = duty; }
+struct TestDisplay {
+  void brightness(int duty) { analogWrite(TFT_BL, TFT_BACKLIGHT_ON ? duty : 255 - duty); }
+} tft;
 ''' + brightness + r'''
 int main() {
   assert(!screenFade.tick(0));

@@ -12,7 +12,7 @@ It is a PlatformIO project with one firmware and a build environment for each su
 - **Attempt limit:** the wrong-PIN counter is stored in flash, so rebooting does not reset it. After 5 wrong PINs the device locks for 30 s, and the wait doubles with each further error. On the 10th wrong PIN, **the whole vault is erased**.
 - **Auto-lock:** after a configurable inactivity timeout (60 s by default), the device locks and the decrypted credentials are wiped from RAM. Choose 30 s, 60 s, 2 min, 5 min or 10 min in **Config. → Auto-lock**; the choice survives a restart.
 - **Display brightness:** open **Config. → Brilho** and use **−/+** to adjust from 10% to 100% in 10% steps (default: 100%). Changes apply immediately and are saved in NVS, including across restarts. Touch and physical-button navigation are supported.
-- **Screen transitions:** a non-blocking 180 ms fade eases in each new screen and returns to your selected brightness. Redrawing the same screen does not restart the animation. Auto-lock and Wi-Fi processing remain active; taps during the fade are discarded. No full-screen framebuffer is needed.
+- **Screen transitions:** a non-blocking 180 ms fade eases in each new screen and returns to your selected brightness. Redrawing the same screen does not restart the animation. Auto-lock and Wi-Fi processing remain active; taps during the fade are discarded. SPI/parallel profiles draw directly; JD9853 and QSPI profiles use a PSRAM framebuffer.
 - **Encrypted storage:** each credential is AES-256-CBC encrypted with a random IV and stored in NVS flash.
 - **Auto-typing:** each credential offers *All* (user + TAB + password), *Login* (user only), *Password* (password only) or **Entrar** (user + TAB + password + ENTER, submitting the form).
 - **Wi-Fi management:** an on-demand Wi-Fi access point with a single-page web app to list, add, edit and delete credentials. Each time it is turned on it gets a **new random password**, accepts only one client, and shuts down after 5 minutes without use.
@@ -22,7 +22,7 @@ It is a PlatformIO project with one firmware and a build environment for each su
 - **Credential sorting:** select **Config. → Ordenar** on the device or **Ordenar por** in the web UI. Choose **Alfabética** (default, ignores letter case), **Mais recente** (newest registrations first; edits keep their original position) or **Mais usada** (highest keyboard-send count first, with alphabetical ties). Favorites stay first in every mode, including search results. The same preference applies to the device and web list and survives restarts. Each completed *All/Login/Password/Entrar* send while the keyboard remains connected counts once; viewing a credential does not count. Existing credentials start with zero uses. Usage counters remain on the device and are reset for imported credentials; backups retain their existing format and do not include the sorting preference or usage history.
 - **Encrypted backup:** export all credentials to a JSON file protected by a backup password, and import them again on the same or another device.
 - **Up to 30 credentials:** name ≤ 32 chars, user ≤ 64, password ≤ 64.
-- **Two supported boards:** T-Display S3 Touch (capacitive touch) and T-Display S3 (physical buttons), both with a 170×320 portrait display and native USB HID.
+- **Native USB boards:** T-Display S3 / S3 Touch, T-Display S3 AMOLED Touch (1.91″), and compact Waveshare ESP32-S3 touch profiles (1.47″, 1.54″, 1.64″, 1.69″ and 1.83″). Every profile uses USB HID without an external keyboard module; all newly added profiles still require hardware validation.
 
 ---
 
@@ -32,6 +32,12 @@ It is a PlatformIO project with one firmware and a build environment for each su
 |---|---|---|---|---|---|
 | `tdisplay-s3-touch` | LilyGO T-Display S3 Touch | ESP32-S3 | ST7789 170×320, 8-bit parallel, portrait | CST816S capacitive (I²C) with gestures | USB HID |
 | `tdisplay-s3` | LilyGO T-Display S3 (no touch) | ESP32-S3 | ST7789 170×320, 8-bit parallel, portrait | 2 physical buttons (GPIO0 / GPIO14) | USB HID |
+| `waveshare-s3-touch-1_69` | Waveshare ESP32-S3-Touch-LCD-1.69 | ESP32-S3 | 1.69″ ST7789V2, 240×280 SPI, portrait | CST816T capacitive | USB HID |
+| `waveshare-s3-touch-1_83` | Waveshare ESP32-S3-Touch-LCD-1.83 | ESP32-S3 | 1.83″ ST7789P, 240×284 SPI, portrait | CST816D capacitive | USB HID |
+| `waveshare-s3-touch-1_54` | Waveshare ESP32-S3-Touch-LCD-1.54 | ESP32-S3 | 1.54″ ST7789, 240×240 SPI | CST816T capacitive | USB HID |
+| `waveshare-s3-touch-1_47` | Waveshare ESP32-S3-Touch-LCD-1.47 | ESP32-S3 | 1.47″ JD9853, 172×320 SPI, portrait | AXS5106L capacitive | USB HID |
+| `waveshare-s3-amoled-1_64` | Waveshare ESP32-S3-Touch-AMOLED-1.64 **V1.1** | ESP32-S3 | 1.64″ CO5300, 280×456 QSPI, portrait | FT3168 capacitive | USB HID |
+| `tdisplay-s3-amoled-touch` | LilyGO T-Display-S3 AMOLED **Touch** | ESP32-S3 | 1.91″ RM67162, 240×536 QSPI, portrait | CST816T capacitive | USB HID |
 
 ---
 
@@ -76,6 +82,12 @@ pio device monitor                           # optional, 115200 baud
 |---|---|
 | T-Display S3 Touch | `tdisplay-s3-touch` |
 | T-Display S3 (no touch) | `tdisplay-s3` |
+| Waveshare S3 Touch 1.69″ | `waveshare-s3-touch-1_69` |
+| Waveshare S3 Touch 1.83″ | `waveshare-s3-touch-1_83` |
+| Waveshare S3 Touch 1.54″ | `waveshare-s3-touch-1_54` |
+| Waveshare S3 Touch 1.47″ | `waveshare-s3-touch-1_47` |
+| Waveshare S3 AMOLED 1.64″ V1.1 | `waveshare-s3-amoled-1_64` |
+| T-Display S3 AMOLED Touch 1.91″ | `tdisplay-s3-amoled-touch` |
 
 **Notes**
 
@@ -86,7 +98,7 @@ pio device monitor                           # optional, 115200 baud
 
 ### 4. Connect the keyboard
 
-- **T-Display S3 / T-Display S3 Touch:** plug the board into the computer you want to type into. It shows up as a USB keyboard; no pairing is needed.
+- **All supported boards:** plug the board into the computer you want to type into. It shows up as a USB keyboard; no pairing is needed.
 
 ### 5. First use
 
@@ -130,7 +142,7 @@ There are two ways to erase everything (PIN and all credentials):
 
 ### Controls by board
 
-| Action | Capacitive touch (T-Display S3 Touch) | Buttons (T-Display S3) |
+| Action | Capacitive touch (T-Display S3 Touch / Waveshare) | Buttons (T-Display S3) |
 |---|---|---|
 | Press a button | Tap | Move the focus with short presses, then **hold GPIO0** |
 | Scroll the menu | Swipe up / down | Move the focus past the first or last visible item |
@@ -322,7 +334,9 @@ Settings ──► Auto-lock (cycle timeout) / Ativar WiFi ──► Wi-Fi AP
 
 PIN changes first re-encrypt the stored credentials with a fresh salt into the temporary NVS namespace `pvnext`. Only after every staging write succeeds is the `pinchange` marker committed. Startup replays committed changes before accepting PIN input; interrupted staging leaves the old PIN active. If NVS lacks room for the temporary copy, the change fails and the old PIN remains valid. If committed recovery cannot complete, the display asks for a restart and keeps the vault inaccessible until recovery succeeds.
 
-Run `python3 test/test_credential_typing.py` to check the keyboard sequences, disconnected-host behavior, usage counting and button bounds for the supported display layout.
+Run `python3 test/test_touch_gesture.py` to exercise tap/hold behavior, release handling, vertical swipes and drag suppression for the Waveshare touch backend.
+
+Run `python3 test/test_credential_typing.py` to check the keyboard sequences, disconnected-host behavior, usage counting and button bounds for all supported display layouts.
 
 Run `python3 test/test_credential_sort.py` to check sorting, favorites, usage persistence, legacy records, deletion, stable IDs and write failures with simulated storage.
 
@@ -381,7 +395,9 @@ Vaults created by earlier firmware (4-digit PIN, single SHA-256) are migrated au
 platformio.ini              one [env:...] per board + shared base sections
 include/
   config.h                  per-board settings (selected by BOARD_xxx) + shared constants
-  input.h                   input abstraction: CST816S / buttons
+  input.h                   input abstraction: CST816 touch / buttons
+  touch_gesture.h           tap/hold/swipe processing for polled touch
+  ui_layout.h               shared drawing and hit-test geometry
   keyboard.h                native USB HID keyboard
   vault_core.h              crypto + NVS storage (hardware-independent)
   vault_web.h               Wi-Fi AP + web server + HTML single-page app (hardware-independent)
@@ -445,6 +461,61 @@ The display pins are the same as on the Touch version. Navigation uses the two s
 
 The focused button has a cyan outline. In the menu, moving past the first or last visible item scrolls the list. You can change the hold time with `BTN_LONG_MS` in `config.h`.
 
+### Waveshare ESP32-S3 touch boards under 2 inches
+
+The new profiles are based on the manufacturer's examples and have been build-checked, but have not been validated on physical boards. All use native USB on GPIO19/20 and 16 MB flash / 8 MB OPI PSRAM. The 1.69″ and 1.83″ profiles use ST7789 over SPI and CST816-family touch over I2C. Buy the complete **ESP32-S3-Touch-LCD** board, not a standalone LCD module or a non-touch variant.
+
+| Signal | 1.69″ | 1.83″ |
+|---|---|---|
+| LCD DC / CS / SCK / MOSI | 4 / 5 / 6 / 7 | 4 / 5 / 6 / 7 |
+| LCD reset / backlight | 8 / 15 | 38 / 40 |
+| Touch SDA / SCL | 11 / 10 | 15 / 14 |
+| Touch reset / interrupt | 13 / 14 | 39 / 13 |
+| Display size / row offset | 240×280 / 20 | 240×284 / 0 |
+| Power | GPIO41 holds SYS_EN high | USB-powered bring-up; no additional AXP2101 battery-management UI |
+
+Tap actions are emitted once when the finger is released. A vertical drag of at least 40 pixels scrolls; a horizontal drag does not activate the initial button. The compact layout keeps PIN entry, PIN cancellation, search, credential actions and all settings within the available height. USB19/20 are reserved for HID and are not assigned to the display or touch.
+
+```bash
+pio run -e waveshare-s3-touch-1_69
+pio run -e waveshare-s3-touch-1_83
+# Add --target upload to flash the selected board.
+```
+
+Use a data-capable USB cable. If the port is unavailable, hold BOOT while resetting, release BOOT, then upload again. Before considering any new profile hardware-validated, check colors/orientation, all screen corners, one action per held touch, scrolling, PIN setup/unlock/change, brightness, web management, credential persistence and USB typing (including Tab and Enter). Battery operation also requires a physical check.
+
+Hardware references:
+
+- [Waveshare 1.69″ documentation](https://docs.waveshare.com/ESP32-S3-Touch-LCD-1.69) and [manufacturer pin configuration](https://github.com/waveshareteam/ESP32-S3-Touch-LCD-1.69/blob/50c85c2616d4e42c56f11ce154e6ce6f3d2dceb0/examples/arduino/libraries/board_config/pin_config.h).
+- [Waveshare 1.83″ documentation](https://docs.waveshare.com/ESP32-S3-Touch-LCD-1.83) and [manufacturer pin configuration](https://github.com/waveshareteam/ESP32-S3-Touch-LCD-1.83/blob/a790c727912d8f2f5f7cf56fd8cca8c892a36c76/examples/arduino/libraries/Mylibrary/pin_config.h). The display offsets follow each manufacturer's HelloWorld example.
+
+### Additional compact touch boards
+
+| Signal | Waveshare 1.54″ | Waveshare 1.47″ | Waveshare AMOLED 1.64″ V1.1 | LilyGO AMOLED Touch 1.91″ |
+|---|---|---|---|---|
+| Display controller | ST7789 | JD9853 (manufacturer register sequence) | CO5300 | RM67162 |
+| Display CS / SCK | 21 / 38 | 21 / 38 | 46 / 10 | 6 / 47 |
+| SPI DC / MOSI | 45 / 39 | 45 / 39 | — | — |
+| QSPI D0 / D1 / D2 / D3 | — | — | 11 / 12 / 13 / 14 | 18 / 7 / 48 / 5 |
+| LCD reset / backlight | 40 / 46 | 40 / 46 | 21 / command 0x51 | 17 / command 0x51 |
+| Touch SDA / SCL | 42 / 41 | 42 / 41 | 47 / 48 | 3 / 2 |
+| Touch reset / interrupt | 47 / 48 | 47 / 48 | board reset / 18 | board reset / 21 |
+| Display offset | 0 / 0 | column 34 | column 20 | 0 / 0 |
+
+- Select the **touch version** of the Waveshare 1.54″ and LilyGO 1.91″. The LilyGO profile targets the QSPI model, not AMOLED Plus (SPI); GPIO38 enables power. Its touch coordinates are transformed from landscape to native portrait.
+- The Waveshare 1.64″ profile targets **V1.1 only**, with display CS on GPIO46. Do not flash it onto V1, whose CS is GPIO9.
+- JD9853 uses the manufacturer's full register sequence, including its pixel format and inversion settings. It is not initialized as an ordinary ST7789 panel.
+- AMOLED brightness and screen fades use the display brightness command, without a backlight GPIO. TFT_eSPI renders the existing fonts into PSRAM; Arduino_GFX sends completed frames over SPI/QSPI. Allocation/initialization failure stops startup.
+- The 240×240 layout uses three columns for credential actions and nine columns for the search keyboard. Drawing and touch hit tests share the same geometry.
+- No hardware validation is claimed for these profiles. Validate display colors/orientation, touch corners/swipes, brightness, PIN changes, web management and USB typing on each physical board. Battery charging/status, audio, SD, RTC and IMU features are not implemented.
+
+Manufacturer sources:
+
+- [Waveshare 1.54″ resources](https://docs.waveshare.com/ESP32-S3-Touch-LCD-1.54/Resources-And-Documents) and [Arduino touch example](https://github.com/waveshareteam/ESP32-S3-Touch-LCD-1.54/blob/5157db7c888e476fd57f8a95020800377447478f/examples/ESP32-S3-Touch-LCD-1.54-demo/Arduino-3.2.0/examples/08_lvgl_arduino_v8/08_lvgl_arduino_v8.ino).
+- [Waveshare 1.47″ resources and original Arduino demo](https://docs.waveshare.com/ESP32-S3-Touch-LCD-1.47/Resources-And-Documents).
+- [Waveshare AMOLED 1.64″ V1.1 example](https://github.com/waveshareteam/ESP32-S3-Touch-AMOLED-1.64-v2/tree/21b952243d306692774f3b5bfeb3eb5cff10f851/Arduino/examples/06_LVGL_Test).
+- [LilyGO AMOLED pin definitions](https://github.com/Xinyuan-LilyGO/LilyGo-AMOLED-Series/blob/e17360cecd7ed9085463b981581172e53dfa1740/src/LilyGo_AMOLED.h) and [touch orientation](https://github.com/Xinyuan-LilyGO/LilyGo-AMOLED-Series/blob/e17360cecd7ed9085463b981581172e53dfa1740/src/LilyGo_AMOLED.cpp).
+
 ---
 
 ## Configuration reference (`include/config.h`)
@@ -466,7 +537,7 @@ Settings shared by every board:
 
 Settings for each board (inside the `#if defined(BOARD_xxx)` blocks): `SCR_W`, `SCR_H`, `TFT_ROTATION`, `PIN_POWER_ON`, the touch or button pins, `TOUCH_DEBOUNCE`, `KBD_USB_HID`, and `MENU_SCROLL_BTNS`, which shows ▲/▼ menu buttons on boards without swipe gestures.
 
-Display driver and pin settings for TFT_eSPI are passed as `build_flags` in `platformio.ini` (`USER_SETUP_LOADED=1`), so the TFT_eSPI library's own `User_Setup.h` is never edited.
+Direct-rendering display driver and pin settings for TFT_eSPI are passed as `build_flags` in `platformio.ini` (`USER_SETUP_LOADED=1`), so the TFT_eSPI library's own `User_Setup.h` is never edited.
 
 ---
 
@@ -475,9 +546,10 @@ Display driver and pin settings for TFT_eSPI are passed as `build_flags` in `pla
 1. **Add an environment:** in `platformio.ini`, add an `[env:my-board]` that `extends` the closest base section (`tdisplay_s3_base`). Set the TFT_eSPI driver and pin flags and add `-DBOARD_MY_BOARD=1`. Include only the libraries this board needs in `lib_deps`.
 2. **Add the board settings:** in `include/config.h`, add an `#elif defined(BOARD_MY_BOARD)` block with the screen size, rotation, the input pins, `TOUCH_DEBOUNCE`, and `KBD_USB_HID`. Only boards with native USB HID are supported.
 3. **Add input support if needed:** if the board's input hardware is new, add a branch to `include/input.h` that implements `inputBegin()` and `inputRead()`.
-4. **Build it** with `pio run -e my-board`.
+4. **Add display support if needed:** add the transport/controller in `include/display.h` for a new SPI/QSPI controller. JD9853 and AMOLED profiles use `DISPLAY_GFX` and require working OPI PSRAM.
+5. **Build it** with `pio run -e my-board`.
 
-The layout in `main.cpp` supports portrait 170×320. Other resolutions may need changes to the `PIN_*`, `NP_*` and `WEB_*` layout constants at the top of `main.cpp`.
+The geometry in `ui_layout.h` supports 170×320, 172×320, 240×240, 240×280, 240×284, 280×456 and 240×536. Other resolutions may need changes to the `PIN_*`, `NP_*` and `WEB_*` layout constants in `ui_layout.h`.
 
 ---
 
