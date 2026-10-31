@@ -1,6 +1,6 @@
 # PassVault
 
-A hardware password manager built on the ESP32. PassVault stores your credentials encrypted on the device. It unlocks with a PIN and **types the username and/or password into any computer** by acting as a keyboard: USB HID on ESP32-S3, Bluetooth LE on the classic ESP32. You add and edit credentials from a phone or laptop through a temporary Wi-Fi access point with a built-in web UI.
+A hardware password manager built on the ESP32-S3. PassVault stores your credentials encrypted on the device. It unlocks with a PIN and **types the username and/or password into any computer** by acting as a keyboard: native USB HID on ESP32-S3, without external keyboard modules or Bluetooth pairing. You add and edit credentials from a phone or laptop through a temporary Wi-Fi access point with a built-in web UI.
 
 It is a PlatformIO project with one firmware and a build environment for each supported board.
 
@@ -11,8 +11,8 @@ It is a PlatformIO project with one firmware and a build environment for each su
 - **PIN lock:** a 6-digit PIN entered on an on-screen numpad. The PIN is created on first boot.
 - **Attempt limit:** the wrong-PIN counter is stored in flash, so rebooting does not reset it. After 5 wrong PINs the device locks for 30 s, and the wait doubles with each further error. On the 10th wrong PIN, **the whole vault is erased**.
 - **Auto-lock:** after a configurable inactivity timeout (60 s by default), the device locks and the decrypted credentials are wiped from RAM. Choose 30 s, 60 s, 2 min, 5 min or 10 min in **Config. → Auto-lock**; the choice survives a restart.
-- **Display brightness:** open **Config. → Brilho** and use **−/+** to adjust from 10% to 100% in 10% steps (default: 100%). Changes apply immediately and are saved in NVS, including across restarts. Touch and physical-button navigation are supported. On generic displays, the backlight must be connected to the configured `TFT_BL` pin through a PWM-capable backlight circuit.
-- **Screen transitions:** a non-blocking 180 ms fade eases in each new screen and returns to your selected brightness. Redrawing the same screen does not restart the animation. Auto-lock and Wi-Fi processing remain active; taps during the fade are discarded. No full-screen framebuffer is needed. Generic displays require the same PWM backlight wiring as brightness adjustment.
+- **Display brightness:** open **Config. → Brilho** and use **−/+** to adjust from 10% to 100% in 10% steps (default: 100%). Changes apply immediately and are saved in NVS, including across restarts. Touch and physical-button navigation are supported.
+- **Screen transitions:** a non-blocking 180 ms fade eases in each new screen and returns to your selected brightness. Redrawing the same screen does not restart the animation. Auto-lock and Wi-Fi processing remain active; taps during the fade are discarded. No full-screen framebuffer is needed.
 - **Encrypted storage:** each credential is AES-256-CBC encrypted with a random IV and stored in NVS flash.
 - **Auto-typing:** each credential offers *All* (user + TAB + password), *Login* (user only), *Password* (password only) or **Entrar** (user + TAB + password + ENTER, submitting the form).
 - **Wi-Fi management:** an on-demand Wi-Fi access point with a single-page web app to list, add, edit and delete credentials. Each time it is turned on it gets a **new random password**, accepts only one client, and shuts down after 5 minutes without use.
@@ -22,7 +22,7 @@ It is a PlatformIO project with one firmware and a build environment for each su
 - **Credential sorting:** select **Config. → Ordenar** on the device or **Ordenar por** in the web UI. Choose **Alfabética** (default, ignores letter case), **Mais recente** (newest registrations first; edits keep their original position) or **Mais usada** (highest keyboard-send count first, with alphabetical ties). Favorites stay first in every mode, including search results. The same preference applies to the device and web list and survives restarts. Each completed *All/Login/Password/Entrar* send while the keyboard remains connected counts once; viewing a credential does not count. Existing credentials start with zero uses. Usage counters remain on the device and are reset for imported credentials; backups retain their existing format and do not include the sorting preference or usage history.
 - **Encrypted backup:** export all credentials to a JSON file protected by a backup password, and import them again on the same or another device.
 - **Up to 30 credentials:** name ≤ 32 chars, user ≤ 64, password ≤ 64.
-- **Several boards:** portrait and landscape layouts, capacitive, resistive or button-only input, and a USB or BLE keyboard.
+- **Two supported boards:** T-Display S3 Touch (capacitive touch) and T-Display S3 (physical buttons), both with a 170×320 portrait display and native USB HID.
 
 ---
 
@@ -32,9 +32,6 @@ It is a PlatformIO project with one firmware and a build environment for each su
 |---|---|---|---|---|---|
 | `tdisplay-s3-touch` | LilyGO T-Display S3 Touch | ESP32-S3 | ST7789 170×320, 8-bit parallel, portrait | CST816S capacitive (I²C) with gestures | USB HID |
 | `tdisplay-s3` | LilyGO T-Display S3 (no touch) | ESP32-S3 | ST7789 170×320, 8-bit parallel, portrait | 2 physical buttons (GPIO0 / GPIO14) | USB HID |
-| `cyd-2432s028` | "Cheap Yellow Display" ESP32-2432S028, 1 USB (micro-USB) | ESP32 | ILI9341 240×320 SPI, portrait | XPT2046 resistive (own SPI bus) | BLE |
-| `cyd-2432s028-2usb` | "Cheap Yellow Display" ESP32-2432S028, 2 USB (micro-USB + USB-C) | ESP32 | ILI9341 (`ILI9341_2_DRIVER`, inverted) 240×320 SPI, portrait | XPT2046 resistive (own SPI bus) | BLE |
-| `generic-ili9341` | Any ESP32 + ILI9341 module | ESP32 | ILI9341 320×240 SPI, landscape | XPT2046 resistive (shared SPI bus) | BLE |
 
 ---
 
@@ -46,7 +43,6 @@ It is a PlatformIO project with one firmware and a build environment for each su
 |---|---|
 | A supported board | See [Supported boards](#supported-boards) |
 | USB cable **with data lines** | Many cheap cables only carry power. If the board is not detected, try another cable first |
-| USB-serial driver (classic ESP32 boards only) | The CYD and most generic ESP32 boards use a **CH340** or **CP210x** chip. macOS and Linux usually work out of the box. On Windows, install the [CH340](https://www.wch-ic.com/downloads/CH341SER_EXE.html) or [CP210x](https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers) driver. The T-Display S3 uses native USB and needs no driver |
 | [VS Code](https://code.visualstudio.com/) + [PlatformIO IDE extension](https://platformio.org/install/ide?install=vscode) | **or** the [PlatformIO Core CLI](https://docs.platformio.org/en/latest/core/installation/index.html), which needs Python 3 |
 | Git (optional) | To clone the repository |
 
@@ -59,11 +55,7 @@ cd PassVault
 
 You can also download and unzip the folder. The PlatformIO project root is the folder that contains `platformio.ini`.
 
-### 3. Wire the display (generic ESP32 + ILI9341 only)
-
-The other boards come assembled and you can skip this step. For the generic build, wire the module following the [pin table](#generic-esp32--ili9341--generic-ili9341). The touch controller shares the SPI bus with the display, so MOSI, MISO and SCLK each go to both. Power the module from 3.3 V.
-
-### 4. Build and flash
+### 3. Build and flash
 
 **Option A — VS Code**
 
@@ -84,27 +76,19 @@ pio device monitor                           # optional, 115200 baud
 |---|---|
 | T-Display S3 Touch | `tdisplay-s3-touch` |
 | T-Display S3 (no touch) | `tdisplay-s3` |
-| CYD ESP32-2432S028, 1 USB (micro-USB) | `cyd-2432s028` |
-| CYD ESP32-2432S028, 2 USB (micro-USB + USB-C) | `cyd-2432s028-2usb` |
-| Generic ESP32 + ILI9341 | `generic-ili9341` |
 
 **Notes**
 
 - **Upload to a single board:** always pass `-e <env>`, for example `pio run -e tdisplay-s3-touch --target upload` (`-t` is short for `--target`). Without `-e`, PlatformIO builds and tries to upload **every** environment in `platformio.ini`.
 - **Multiple serial ports:** if several ports are connected, choose one with `--upload-port /dev/cu.usbmodem1101` (on Windows, `COM5`), or set `upload_port` in the env.
 - **T-Display S3 upload fails:** because the board runs as a USB keyboard, its serial port may not respond. Put it in download mode by holding **BOOT**, pressing and releasing **RST**, then releasing **BOOT**, and upload again. Press **RST** after flashing to start the firmware.
-- **Classic ESP32 upload fails** with "Failed to connect": hold **BOOT** while the upload says `Connecting....`.
-- **Build every board:** `pio run` with no `-e`. All libraries download automatically, and the BLE Keyboard fix is applied automatically.
+- **Build every board:** `pio run` with no `-e`. All required libraries download automatically.
 
-### 5. Board-specific first steps
+### 4. Connect the keyboard
 
 - **T-Display S3 / T-Display S3 Touch:** plug the board into the computer you want to type into. It shows up as a USB keyboard; no pairing is needed.
-- **CYD / generic:**
-  1. Check the touch first. If taps land in the wrong place, calibrate it ([CYD](#cyd-esp32-2432s028--cyd-2432s028), [generic](#generic-esp32--ili9341--generic-ili9341)), then flash again.
-  2. On the computer or phone, open the Bluetooth settings and pair with **"PassVault"**.
-  3. The `BLE` label in the menu turns green when the host is connected.
 
-### 6. First use
+### 5. First use
 
 1. **Create a PIN:** on first boot, enter a 6-digit PIN twice. Unlocking takes a moment ("Verificando...") because of the key derivation.
 2. **Turn on Wi-Fi:** tap **Config. → Ativar WiFi**. The screen shows the network `PassVault`, a **random password** and the URL (normally `http://192.168.4.1`).
@@ -116,7 +100,7 @@ pio device monitor                           # optional, 115200 baud
 
 > The host keyboard layout should be **US**, because HID sends US key codes. With another layout, symbols in passwords may come out wrong.
 
-### 7. Updating the firmware
+### 6. Updating the firmware
 
 Flash again with the same `-t upload` command. **Your credentials and PIN are kept.** They live in the NVS partition, which a normal upload does not overwrite. Vaults from older firmware are converted to the new format on the first unlock (see [Upgrading from the old format](#security-model)).
 
@@ -128,7 +112,7 @@ Credentials can be lost in these cases:
 
 Before such changes, **export a backup** from the web UI (see [Backup](#backup-export--import)) and import it again afterwards.
 
-### 8. Resetting the vault
+### 7. Resetting the vault
 
 There are two ways to erase everything (PIN and all credentials):
 
@@ -146,13 +130,11 @@ There are two ways to erase everything (PIN and all credentials):
 
 ### Controls by board
 
-| Action | Capacitive touch (T-Display S3 Touch) | Resistive touch (CYD / generic) | Buttons (T-Display S3) |
-|---|---|---|---|
-| Press a button | Tap | Tap firmly (one tap = one press; holding does not repeat) | Move the focus with short presses, then **hold GPIO0** |
-| Scroll the menu | Swipe up / down | Tap the **▲ / ▼** buttons beside the list | Move the focus past the first or last visible item |
-| Back | *Voltar* button | *Voltar* button | **Hold GPIO14** |
-
-> **Resistive boards (CYD / generic):** these boards have no swipe gesture, so the menu shows **▲ / ▼ buttons** to the right of the list when there are more than 4 credentials. A button is greyed out when the list cannot scroll further in that direction.
+| Action | Capacitive touch (T-Display S3 Touch) | Buttons (T-Display S3) |
+|---|---|---|
+| Press a button | Tap | Move the focus with short presses, then **hold GPIO0** |
+| Scroll the menu | Swipe up / down | Move the focus past the first or last visible item |
+| Back | *Voltar* button | **Hold GPIO14** |
 
 On the button board, the focused button has a **cyan outline**. A short press on **GPIO0** moves to the next button, and a short press on **GPIO14** moves to the previous one. Holding GPIO14 does the following:
 
@@ -196,7 +178,6 @@ Use **Revelar** on the detail screen to display the password for **3 seconds**. 
 
 **Entrar** appends Enter to submit the form. **Tudo**, **Login** and **Senha** do not append Enter; submit manually after using those options.
 
-**BLE boards:** typing only works while the `BLE` label in the menu is **green** (a host is connected). When it is grey, nothing is sent.
 
 ### Managing credentials (web UI)
 
@@ -332,16 +313,16 @@ Settings ──► Auto-lock (cycle timeout) / Ativar WiFi ──► Wi-Fi AP
 ```
 
 - **PIN screens:** a numpad with digits, `C` (clear) and `<` (backspace).
-- **Menu:** a scrollable credential list (swipe on the touch board, or button navigation) plus *Config.* (Settings) and *Bloquear* (Lock) buttons. The top-right corner shows `USB` or `BLE`. For BLE it is green only while a host is paired.
+- **Menu:** a scrollable credential list (swipe on the touch board, or button navigation) plus *Config.* (Settings) and *Bloquear* (Lock) buttons. The top-right corner shows `USB`.
 - **Settings:** press *Auto-lock* to cycle through 30 s, 60 s, 2 min, 5 min and 10 min. Each change takes effect immediately and is saved in NVS. *Ativar WiFi* opens the Wi-Fi screen; *Voltar* returns to the menu. Physical-button boards use the same focus navigation as other screens. The Wi-Fi screen keeps its separate 5-minute idle timeout.
 - **Detail:** shows the name and username with the password masked, plus the *Tudo / Login / Senha / Entrar / Voltar* buttons.
-- **Typing feedback:** *Tudo*, *Login*, *Senha* and *Entrar* show **Digitando...** during USB/BLE transmission, followed by **Envio finalizado** for 0.9 s before returning to the detail screen. Credential contents stay hidden during this feedback.
+- **Typing feedback:** *Tudo*, *Login*, *Senha* and *Entrar* show **Digitando...** during USB transmission, followed by **Envio finalizado** for 0.9 s before returning to the detail screen. Credential contents stay hidden during this feedback.
 - **Themes:** open **Config. → Temas** on the device and select **Cyber Green**, **Azul**, **Roxo** or **Ambar**. The palette changes immediately across the display, including the PIN screen. An asterisk marks the active theme, and the choice survives a restart. Touch and physical-button navigation are supported; auto-lock remains active in this tab.
 - **Change unlock PIN:** open **Config. → Alterar PIN**, enter the current PIN, then enter and confirm a new 6-digit PIN. Legacy 4-digit PINs are accepted as the current PIN. On success the device locks; unlock with the new PIN. Credentials, favorites and settings are preserved. *Cancelar* (or holding Back on button boards) cancels without changing the PIN, and auto-lock remains active throughout the flow. An incorrect current PIN ends the unlocked session and counts toward the existing lockout/wipe limits.
 
 PIN changes first re-encrypt the stored credentials with a fresh salt into the temporary NVS namespace `pvnext`. Only after every staging write succeeds is the `pinchange` marker committed. Startup replays committed changes before accepting PIN input; interrupted staging leaves the old PIN active. If NVS lacks room for the temporary copy, the change fails and the old PIN remains valid. If committed recovery cannot complete, the display asks for a restart and keeps the vault inaccessible until recovery succeeds.
 
-Run `python3 test/test_credential_typing.py` to check the keyboard sequences, disconnected-host behavior, usage counting and button bounds for all display layouts.
+Run `python3 test/test_credential_typing.py` to check the keyboard sequences, disconnected-host behavior, usage counting and button bounds for the supported display layout.
 
 Run `python3 test/test_credential_sort.py` to check sorting, favorites, usage persistence, legacy records, deletion, stable IDs and write failures with simulated storage.
 
@@ -392,23 +373,20 @@ Vaults created by earlier firmware (4-digit PIN, single SHA-256) are migrated au
 
 - **Offline guessing is slowed, not stopped.** Someone who dumps the flash can still try every 6-digit PIN offline. PBKDF2 makes each guess slower, but 1,000,000 PINs is still within reach of a GPU. The on-device attempt limit does not apply to a flash dump. For real protection against physical attacks, enable ESP32 **flash encryption** (with NVS encryption) and **secure boot**. These are one-way eFuse operations; see [Hardening: flash encryption & secure boot](#hardening-flash-encryption--secure-boot).
 - **The web UI is plain HTTP.** It is protected only by the WPA2 password of the AP.
-- **A paired BLE host receives keystrokes.** Pair the device only with computers you trust.
 - **Unlock speed:** `KDF_ITERS` sets how long an unlock takes. More iterations make offline guessing slower but also make unlocking slower. Tune it on your board.
 
 ### Code layout
 
 ```
 platformio.ini              one [env:...] per board + shared base sections
-scripts/
-  patch_blekeyboard.py      pre-build fix of the BLE Keyboard lib for core 3.x
 include/
   config.h                  per-board settings (selected by BOARD_xxx) + shared constants
-  input.h                   input abstraction: CST816S / XPT2046 / buttons
-  keyboard.h                keyboard abstraction: USB HID / BLE
+  input.h                   input abstraction: CST816S / buttons
+  keyboard.h                native USB HID keyboard
   vault_core.h              crypto + NVS storage (hardware-independent)
   vault_web.h               Wi-Fi AP + web server + HTML single-page app (hardware-independent)
 src/
-  main.cpp                  UI, layout (portrait/landscape) and state machine
+  main.cpp                  UI, portrait layout and state machine
 ```
 
 **`input.h`** exposes two functions:
@@ -467,57 +445,6 @@ The display pins are the same as on the Touch version. Navigation uses the two s
 
 The focused button has a cyan outline. In the menu, moving past the first or last visible item scrolls the list. You can change the hold time with `BTN_LONG_MS` in `config.h`.
 
-### CYD ESP32-2432S028 — `cyd-2432s028` / `cyd-2432s028-2usb`
-
-- **Orientation:** portrait 240×320, with the USB connectors at the bottom (`TFT_ROTATION=2`). The touch uses the same rotation.
-- **Display:** ILI9341 on HSPI (`USE_HSPI_PORT`) with MISO 12, MOSI 13, SCLK 14, CS 15, DC 2, RST –1 and backlight 21, at 27 MHz SPI.
-- **Touch:** the XPT2046 is on its **own VSPI bus**: CLK 25, MOSI 32, MISO 39, CS 33, IRQ 36. `tft.getTouch()` cannot reach it, so this board uses the `PaulStoffregen/XPT2046_Touchscreen` library.
-- **Calibration:** if taps land in the wrong place, adjust the raw ADC range in `config.h`:
-
-  ```cpp
-  #define XPT_X_MIN 240
-  #define XPT_X_MAX 3800
-  #define XPT_Y_MIN 395
-  #define XPT_Y_MAX 3895
-  ```
-
-  Print `touch.getPoint()` over Serial while touching the corners to find your values. If an axis is mirrored, swap its MIN and MAX.
-- **Versions:** both share pins, touch and layout (`[cyd_base]` in `platformio.ini`) and differ only in the display driver:
-  - `cyd-2432s028` — 1 USB (micro-USB): `ILI9341_DRIVER`.
-  - `cyd-2432s028-2usb` — 2 USB (micro-USB + USB-C): `ILI9341_2_DRIVER` with `TFT_INVERSION_ON`. On the 1-USB profile this panel shows inverted colours and a rotated, garbled image.
-  - USB connector count usually identifies the panel, but not always. If neither profile looks right, try `-DST7789_DRIVER=1` in the 2-USB profile.
-- **Keyboard:** BLE (see [BLE keyboard](#ble-keyboard-classic-esp32-boards)).
-
-### Generic ESP32 + ILI9341 — `generic-ili9341`
-
-Wiring (VSPI, touch shares the bus):
-
-| Signal | GPIO |
-|---|---|
-| TFT MOSI / T_DIN | 23 |
-| TFT MISO / T_DO | 19 |
-| TFT SCLK / T_CLK | 18 |
-| TFT CS | 5 |
-| TFT DC | 16 |
-| TFT RST | 17 |
-| TFT backlight (LED) | 4 |
-| Touch CS (T_CS) | 27 |
-
-**Touch calibration is required.** Run the TFT_eSPI example `Touch_calibrate` with rotation 1 and the same build flags. Then copy the five values it prints into `config.h`:
-
-```cpp
-#define TOUCH_CAL_DATA { 300, 3500, 300, 3500, 1 }
-```
-
-### BLE keyboard (classic ESP32 boards)
-
-- **Pairing:** pair the computer or phone with the Bluetooth device **"PassVault"**. You can change the name with `BLE_KBD_NAME` in `config.h`. The menu shows `BLE` in green when a host is connected. Typing does nothing while no host is connected.
-- **Library fix:** these boards use [`t-vk/ESP32 BLE Keyboard`](https://github.com/T-vK/ESP32-BLE-Keyboard), which does not compile on Arduino-ESP32 core 3.x without changes. `scripts/patch_blekeyboard.py` runs before every build and fixes it automatically. It is safe to run repeatedly. It does the following:
-  - `BLEDevice::init(deviceName)` → `BLEDevice::init(String(deviceName.c_str()))`
-  - `setValue(deviceManufacturer)` → `setValue(String(deviceManufacturer.c_str()))`
-  - removes the unused `#include <driver/adc.h>`, which triggers a deprecation warning
-- **Flash size:** BLE + Wi-Fi together take about 1.7 MB of flash, so all boards use the `huge_app.csv` partition table, which has no OTA.
-
 ---
 
 ## Configuration reference (`include/config.h`)
@@ -535,10 +462,9 @@ Settings shared by every board:
 | `AP_SSID` / `AP_PASS_LEN` | `PassVault` / 10 | AP name and length of the random password |
 | `WEB_IDLE_MS` | 300000 | Wi-Fi idle time before the AP shuts down and the device locks |
 | `AUTOLOCK_MS` | 60000 | Default inactivity timeout; the device settings override it with a value from `AUTOLOCK_OPTIONS_MS` |
-| `BLE_KBD_NAME` | `PassVault` | Bluetooth device name |
 | `C_*` | — | UI colours (RGB565) |
 
-Settings for each board (inside the `#if defined(BOARD_xxx)` blocks): `SCR_W`, `SCR_H`, `TFT_ROTATION`, `USE_LANDSCAPE`, `PIN_POWER_ON`, the touch or button pins, `TOUCH_DEBOUNCE`, calibration, the keyboard type (`KBD_USB_HID` or `KBD_BLE`), and `MENU_SCROLL_BTNS`, which shows ▲/▼ menu buttons on boards without swipe gestures.
+Settings for each board (inside the `#if defined(BOARD_xxx)` blocks): `SCR_W`, `SCR_H`, `TFT_ROTATION`, `PIN_POWER_ON`, the touch or button pins, `TOUCH_DEBOUNCE`, `KBD_USB_HID`, and `MENU_SCROLL_BTNS`, which shows ▲/▼ menu buttons on boards without swipe gestures.
 
 Display driver and pin settings for TFT_eSPI are passed as `build_flags` in `platformio.ini` (`USER_SETUP_LOADED=1`), so the TFT_eSPI library's own `User_Setup.h` is never edited.
 
@@ -546,12 +472,12 @@ Display driver and pin settings for TFT_eSPI are passed as `build_flags` in `pla
 
 ## Adding a new board
 
-1. **Add an environment:** in `platformio.ini`, add an `[env:my-board]` that `extends` the closest base section (`tdisplay_s3_base` or `ili9341_ble_base`). Set the TFT_eSPI driver and pin flags and add `-DBOARD_MY_BOARD=1`. Include only the libraries this board needs in `lib_deps`.
-2. **Add the board settings:** in `include/config.h`, add an `#elif defined(BOARD_MY_BOARD)` block with the screen size, rotation, `USE_LANDSCAPE` if the screen is wider than tall, the input pins, `TOUCH_DEBOUNCE`, and `KBD_USB_HID` (ESP32-S3) or `KBD_BLE` (ESP32).
+1. **Add an environment:** in `platformio.ini`, add an `[env:my-board]` that `extends` the closest base section (`tdisplay_s3_base`). Set the TFT_eSPI driver and pin flags and add `-DBOARD_MY_BOARD=1`. Include only the libraries this board needs in `lib_deps`.
+2. **Add the board settings:** in `include/config.h`, add an `#elif defined(BOARD_MY_BOARD)` block with the screen size, rotation, the input pins, `TOUCH_DEBOUNCE`, and `KBD_USB_HID`. Only boards with native USB HID are supported.
 3. **Add input support if needed:** if the board's input hardware is new, add a branch to `include/input.h` that implements `inputBegin()` and `inputRead()`.
 4. **Build it** with `pio run -e my-board`.
 
-The layout in `main.cpp` supports portrait 170×320 / 240×320 and landscape 320×240. Other resolutions may need changes to the `PIN_*`, `NP_*` and `WEB_*` layout constants at the top of `main.cpp`.
+The layout in `main.cpp` supports portrait 170×320. Other resolutions may need changes to the `PIN_*`, `NP_*` and `WEB_*` layout constants at the top of `main.cpp`.
 
 ---
 
@@ -594,17 +520,17 @@ custom_sdkconfig =
 
 1. Create a separate `-secure` environment and keep the normal environments unchanged.
 2. Enable **flash encryption + NVS encryption in development mode** only, and flash a spare board.
-3. Confirm that it boots, the PIN works, credentials persist and USB/BLE typing still works.
+3. Confirm that it boots, the PIN works, credentials persist and USB typing still works.
 4. Only then add **secure boot** and, when you are fully satisfied, switch to **release** mode.
 
-See Espressif's documentation for the exact steps for your chip (ESP32 and ESP32-S3 differ): *Flash Encryption*, *Secure Boot v2* and *NVS Encryption* in the ESP-IDF Programming Guide.
+See Espressif's documentation for the exact steps for the ESP32-S3: *Flash Encryption*, *Secure Boot v2* and *NVS Encryption* in the ESP-IDF Programming Guide.
 
 ---
 
 ## Build notes
 
 - **Arduino-ESP32 core:** this project targets core **3.x**, built with core 3.3.12.
-- **Library finder:** `lib_ldf_mode = deep` is required. With the default mode, the core's own libraries fail to find their internal dependencies, for example `USB → FS.h` and `WiFi → Network.h`. Because `deep` ignores `#if`, the BLE environments set `lib_ignore = USB`.
+- **Library finder:** `lib_ldf_mode = deep` is required. With the default mode, the core's own libraries fail to find their internal dependencies, for example `USB → FS.h` and `WiFi → Network.h`.
 - **Library warnings:** `DISABLE_ALL_LIBRARY_WARNINGS` silences TFT_eSPI's informational warnings, and `-Wno-attributes` silences a warning inside the CST816S library. Every environment builds with no warnings.
 
 ---
@@ -616,9 +542,6 @@ See Espressif's documentation for the exact steps for your chip (ESP32 and ESP32
 | `FS.h` / `Network.h: No such file or directory` | Make sure `lib_ldf_mode = deep` is set |
 | Upload fails on T-Display S3 | Enter download mode: hold BOOT, press RST, release BOOT |
 | Nothing typed on USB boards | Use the USB-C data port and make sure the host recognised a keyboard |
-| Nothing typed on BLE boards | Check that `BLE` is green in the menu and pair again if needed. On macOS, accept the keyboard-identification prompt |
 | Wrong characters typed | Set the host keyboard layout to **US**. HID sends US key codes |
-| Touch offset or mirrored (CYD / generic) | Recalibrate (see the board sections above) |
-| White, inverted or garbled CYD screen | Try the other CYD profile (`cyd-2432s028` ↔ `cyd-2432s028-2usb`) |
 | Forgot the PIN | Enter 10 wrong PINs, or erase the flash with `pio run -e <env> -t erase` and upload again. **All credentials are lost** |
 | Unlock takes too long | Lower `KDF_ITERS` (this makes offline guessing faster) |

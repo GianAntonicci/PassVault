@@ -1,4 +1,4 @@
-"""Check production keyboard sequences and detail button bounds on every layout."""
+"""Check production keyboard sequences and detail button bounds on the supported 170x320 layout."""
 from pathlib import Path
 import shutil
 import subprocess
@@ -54,12 +54,10 @@ with tempfile.TemporaryDirectory(prefix='passvault-typing-') as temp:
     compiler = shutil.which('clang++') or shutil.which('g++')
     if not compiler:
         raise SystemExit('A C++17 compiler is required')
-    for width, height in [(170, 320), (240, 320), (320, 240)]:
+    for width, height in [(170, 320)]:
         cpp = Path(temp) / 'test.cpp'
         binary = Path(temp) / 'test'
         defines = f'#define SCR_W {width}\n#define SCR_H {height}\n'
-        if width > height:
-            defines += '#define USE_LANDSCAPE\n'
         cpp.write_text(support + defines + typing + layout + checks)
         subprocess.run([compiler, '-std=c++17', '-Wall', '-Wextra', str(cpp), '-o', str(binary)], check=True)
         subprocess.run([str(binary)], check=True)

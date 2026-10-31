@@ -54,60 +54,6 @@ bool inputRead(int &x, int &y, int &gesture) {
 }
 
 // ---------------------------------------------------------------------
-#elif defined(BOARD_CYD)
-// ---- XPT2046 em SPI proprio (VSPI): tft.getTouch() nao alcanca ----
-
-#include <SPI.h>
-#include <XPT2046_Touchscreen.h>
-
-SPIClass            touchSpi(VSPI);
-XPT2046_Touchscreen touch(XPT_CS, XPT_IRQ);
-
-void inputBegin() {
-  touchSpi.begin(XPT_CLK, XPT_MISO, XPT_MOSI, XPT_CS);
-  touch.begin(touchSpi);
-  touch.setRotation(TFT_ROTATION);
-}
-
-bool inputRead(int &x, int &y, int &gesture) {
-  // Resistivo: so reporta a borda de descida (novo toque), nao o "segurar"
-  static bool wasDown = false;
-  bool down = touch.touched();
-  bool edge = down && !wasDown;
-  wasDown = down;
-  if (!edge) return false;
-
-  TS_Point p = touch.getPoint();
-  x = constrain(map(p.x, XPT_X_MIN, XPT_X_MAX, 0, SCR_W), 0, SCR_W - 1);
-  y = constrain(map(p.y, XPT_Y_MIN, XPT_Y_MAX, 0, SCR_H), 0, SCR_H - 1);
-  gesture = GESTURE_NONE;
-  return true;
-}
-
-// ---------------------------------------------------------------------
-#elif defined(BOARD_GENERIC_ILI9341)
-// ---- XPT2046 no mesmo barramento do display, via TFT_eSPI ----
-
-void inputBegin() {
-  uint16_t cal[5] = TOUCH_CAL_DATA;
-  tft.setTouch(cal);
-}
-
-bool inputRead(int &x, int &y, int &gesture) {
-  static bool wasDown = false;
-  uint16_t tx, ty;
-  bool down = tft.getTouch(&tx, &ty);
-  bool edge = down && !wasDown;
-  wasDown = down;
-  if (!edge) return false;
-
-  x = tx;
-  y = ty;
-  gesture = GESTURE_NONE;
-  return true;
-}
-
-// ---------------------------------------------------------------------
 #elif defined(BOARD_TDISPLAY_S3)
 // ---- 2 botoes fisicos navegando um anel de foco ----
 //  BTN_DOWN (GPIO0):  clique = proximo alvo   | segurar = confirma (toque)

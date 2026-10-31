@@ -1,7 +1,7 @@
 /*
  *  PassVault — Password Manager
  *  Multi-placa: ver BOARD_XXX em platformio.ini / config.h
- *  TFT_eSPI + input.h (touch/botoes) + keyboard.h (USB HID/BLE)
+ *  TFT_eSPI + input.h (touch/botoes) + keyboard.h (USB HID)
  *  PlatformIO build
  */
 
@@ -63,19 +63,7 @@ unsigned long lockoutEnd = 0;
 unsigned long lockoutTick = 0;
 unsigned long lastAction = 0;
 
-// ---- Layout: portrait 170x320 / 240x320 vs landscape 320x240 ----
-#ifdef USE_LANDSCAPE
-  #define PIN_TITLE_Y   6
-  #define PIN_MSG_Y     36
-  #define PIN_BOX_Y     56
-  #define PIN_BOX_H     28
-  #define NP_BW         64
-  #define NP_BH         32
-  #define NP_Y0         92
-  #define WEB_TITLE_Y   16
-  #define WEB_LINE_Y    60
-  #define WEB_BTN_Y     178
-#else
+// ---- Layout: portrait 170x320 (T-Display S3 / Touch) ----
   #define PIN_TITLE_Y   20
   #define PIN_MSG_Y     60
   #define PIN_BOX_Y     95
@@ -86,13 +74,8 @@ unsigned long lastAction = 0;
   #define WEB_TITLE_Y   30
   #define WEB_LINE_Y    80
   #define WEB_BTN_Y     200
-#endif
-// Aviso ("PIN incorreto!") — no landscape substitui a linha de instrucao
-#ifdef USE_LANDSCAPE
-  #define PIN_WARN_Y    PIN_MSG_Y
-#else
+// Aviso de PIN incorreto abaixo da instrucao
   #define PIN_WARN_Y    75
-#endif
 
 // ---- Forward declarations ----
 void drawMenu();
@@ -188,12 +171,6 @@ void drawPinScreen(const char* title) {
   tft.fillScreen(C_BG);
   tft.setTextColor(C_ACCENT);
   tft.setTextDatum(TC_DATUM);
-#ifdef USE_LANDSCAPE
-  if (changingPin()) {
-    tft.setTextDatum(TL_DATUM);
-    tft.drawString(title, 10, PIN_TITLE_Y, 2);
-  } else
-#endif
     tft.drawString(title, SCR_W / 2, PIN_TITLE_Y, 4);
 
   tft.setTextColor(C_DIM);
@@ -205,19 +182,12 @@ void drawPinScreen(const char* title) {
   drawPinBoxes();
   drawNumpad();
   if (changingPin()) {
-#ifdef USE_LANDSCAPE
-    btn(SCR_W - 82, 4, 74, 26, "Cancelar", C_BTN);
-#else
     btn(10, 286, SCR_W - 20, 28, "Cancelar", C_BTN);
-#endif
   }
   focusEnd();
 }
 
 void drawPinWarn(const char* msg) {
-#ifdef USE_LANDSCAPE
-  tft.fillRect(0, PIN_WARN_Y, SCR_W, 16, C_BG);
-#endif
   tft.setTextColor(C_WARN);
   tft.setTextDatum(TC_DATUM);
   tft.drawString(msg, SCR_W / 2, PIN_WARN_Y, 2);
@@ -298,11 +268,7 @@ void drawBusy(const char* msg) {
 
 void handlePinTouch(int tx, int ty) {
   if (changingPin()) {
-#ifdef USE_LANDSCAPE
-    bool cancel = inBox(tx, ty, SCR_W - 82, 4, 74, 26);
-#else
     bool cancel = inBox(tx, ty, 10, 286, SCR_W - 20, 28);
-#endif
     if (cancel) { cancelPinChange(); return; }
   }
   int key = hitNumpad(tx, ty);
@@ -416,18 +382,11 @@ void handlePinTouch(int tx, int ty) {
 #define MENU_BTN_W   75
 #define MENU_BTN_H   38
 
-// Campo de busca: landscape fica no cabecalho, portrait ganha uma linha propria
-#ifdef USE_LANDSCAPE
-  #define SRCH_X       132
-  #define SRCH_Y       6
-  #define SRCH_W       (SCR_W - 50 - 6 - SRCH_X)
-  #define MENU_LIST_Y  45
-#else
+// Campo de busca em uma linha propria
   #define SRCH_X       4
   #define SRCH_Y       40
   #define SRCH_W       (SCR_W - 8)
   #define MENU_LIST_Y  72
-#endif
 #define SRCH_H       26
 
 // Placas sem gesto de swipe ganham uma coluna de botoes cima/baixo ao lado da lista
@@ -451,7 +410,7 @@ void drawScrollBtn(int y, bool up, bool enabled) {
   #define MENU_ITEM_W  (SCR_W - 8)
 #endif
 
-// Indicador do teclado (BLE muda em tempo de execucao)
+// Indicador do teclado USB
 bool kbdShownConnected = false;
 
 void drawKbdStatus() {
@@ -594,15 +553,9 @@ void handleMenuTouch(int tx, int ty, int gesture) {
 
 // ---- Busca (teclado na tela) ----
 // 36 teclas A-Z/0-9 + linha de acoes: 0=apagar 1=limpar 2=OK
-#ifdef USE_LANDSCAPE
-  #define KB_COLS  9
-  #define KB_KH    27
-  #define KB_Y0    72
-#else
   #define KB_COLS  6
   #define KB_KH    28
   #define KB_Y0    74
-#endif
 #define KB_GAP   3
 #define KB_KEYS  36
 #define KB_KW    ((SCR_W - 8 - (KB_COLS - 1) * KB_GAP) / KB_COLS)
@@ -727,28 +680,13 @@ void typeCredential(int mode) {
 // Entrar envia login + Tab + senha + Enter (modo 3).
 #define DET_BTN_COUNT 7
 #define DET_GAP    8
-#ifdef USE_LANDSCAPE
-  #define DET_BTN_H  38
-  #define DET_BTN_W  ((SCR_W - 5 * DET_GAP) / 4)
-#else
   #define DET_BTN_H  34
   #define DET_BTN_W  75
-#endif
 
 void detailBtnPos(int i, int &x, int &y) {
-#ifdef USE_LANDSCAPE
-  if (i >= 4) {
-    x = (SCR_W - 3 * DET_BTN_W - 2 * DET_GAP) / 2 + (i - 4) * (DET_BTN_W + DET_GAP);
-    y = 150;
-  } else {
-    x = DET_GAP + i * (DET_BTN_W + DET_GAP);
-    y = SCR_H - DET_BTN_H - 6;
-  }
-#else
   int x1 = (SCR_W - 2 * DET_BTN_W - DET_GAP) / 2;
   x = i == 6 ? (SCR_W - DET_BTN_W) / 2 : x1 + (i % 2) * (DET_BTN_W + DET_GAP);
   y = 154 + (i / 2) * (DET_BTN_H + DET_GAP);
-#endif
 }
 
 const char* detLabels[DET_BTN_COUNT] = {"Tudo", "Login", "Senha", "Voltar", "Revelar", "Favoritar", "Entrar"};
@@ -824,30 +762,15 @@ void handleDetailTouch(int tx, int ty) {
 // ---- Configuracoes ----
 #define SETTINGS_X       10
 #define SETTINGS_W       (SCR_W - 20)
-#ifdef USE_LANDSCAPE
-  #define SETTINGS_H       26
-  #define SETTINGS_LOCK_Y  34
-  #define SETTINGS_WIFI_Y  66
-  #define SETTINGS_THEME_Y 98
-  #define SETTINGS_PIN_Y   130
-  #define SETTINGS_BRIGHT_Y 162
-#else
 #define SETTINGS_H       30
 #define SETTINGS_LOCK_Y  38
 #define SETTINGS_WIFI_Y  96
 #define SETTINGS_THEME_Y 130
 #define SETTINGS_PIN_Y   164
 #define SETTINGS_BRIGHT_Y 198
-#endif
-#ifdef USE_LANDSCAPE
-  #define SETTINGS_EXTRA_W ((SETTINGS_W - 6) / 2)
-  #define SETTINGS_SORT_X (SETTINGS_X + SETTINGS_EXTRA_W + 6)
-  #define SETTINGS_SORT_Y SETTINGS_BRIGHT_Y
-#else
   #define SETTINGS_EXTRA_W SETTINGS_W
   #define SETTINGS_SORT_X SETTINGS_X
   #define SETTINGS_SORT_Y 232
-#endif
 #define SETTINGS_BACK_Y  (SCR_H - SETTINGS_H - 8)
 
 void drawSettings() {
@@ -864,11 +787,9 @@ void drawSettings() {
   else
     snprintf(label, sizeof(label), "Auto-lock: %lu min", autoLockMs / 60000UL);
   btn(SETTINGS_X, SETTINGS_LOCK_Y, SETTINGS_W, SETTINGS_H, label, C_ACCENT);
-#ifndef USE_LANDSCAPE
   tft.setTextColor(C_DIM);
   tft.setTextDatum(TC_DATUM);
   tft.drawString("Pressione para mudar", SCR_W / 2, SETTINGS_LOCK_Y + SETTINGS_H + 6, 2);
-#endif
   btn(SETTINGS_X, SETTINGS_WIFI_Y, SETTINGS_W, SETTINGS_H, "Ativar WiFi", C_BTN);
   btn(SETTINGS_X, SETTINGS_THEME_Y, SETTINGS_W, SETTINGS_H, "Temas", C_ACCENT);
   btn(SETTINGS_X, SETTINGS_PIN_Y, SETTINGS_W, SETTINGS_H, "Alterar PIN", C_BTN);
@@ -998,17 +919,10 @@ void handleSettingsTouch(int tx, int ty) {
     bool saved = setAutoLock(AUTOLOCK_OPTIONS_MS[next]);
     drawSettings();
     if (!saved) {
-#ifdef USE_LANDSCAPE
-      tft.fillRect(0, 190, SCR_W, 16, C_BG);
-      tft.setTextColor(C_WARN);
-      tft.setTextDatum(TC_DATUM);
-      tft.drawString("Falha ao salvar", SCR_W / 2, 190, 2);
-#else
       tft.fillRect(0, SETTINGS_LOCK_Y + SETTINGS_H + 6, SCR_W, 16, C_BG);
       tft.setTextColor(C_WARN);
       tft.setTextDatum(TC_DATUM);
       tft.drawString("Falha ao salvar", SCR_W / 2, SETTINGS_LOCK_Y + SETTINGS_H + 6, 2);
-#endif
     }
   } else if (inBox(tx, ty, SETTINGS_X, SETTINGS_WIFI_Y, SETTINGS_W, SETTINGS_H)) {
     startWeb();
@@ -1210,7 +1124,7 @@ void loop() {
     return;
   }
 
-  // Atualiza o indicador quando o host BLE conecta/desconecta
+  // Atualiza o indicador de conexao do teclado USB
   if (state == ST_MENU && kbdConnected() != kbdShownConnected) drawKbdStatus();
 
   int tx, ty, gesture;
