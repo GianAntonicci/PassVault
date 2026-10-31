@@ -19,6 +19,7 @@ It is a PlatformIO project with one firmware and a build environment for each su
 - **Search by name:** filter the menu list with an on-screen A–Z/0–9 keyboard. Matching ignores case and finds the text anywhere in the name.
 - **Password generator:** the web UI creates random passwords with a chosen length and character types.
 - **Favorites:** mark frequently used credentials with **Favoritar** on the device or web detail screen. Favorites appear first, including in search results, and survive locking and rebooting. Use **Desmarcar** to remove the mark.
+- **Credential sorting:** select **Config. → Ordenar** on the device or **Ordenar por** in the web UI. Choose **Alfabética** (default, ignores letter case), **Mais recente** (newest registrations first; edits keep their original position) or **Mais usada** (highest keyboard-send count first, with alphabetical ties). Favorites stay first in every mode, including search results. The same preference applies to the device and web list and survives restarts. Each completed *All/Login/Password* send while the keyboard remains connected counts once; viewing a credential does not count. Existing credentials start with zero uses. Usage counters remain on the device and are reset for imported credentials; backups retain their existing format and do not include the sorting preference or usage history.
 - **Encrypted backup:** export all credentials to a JSON file protected by a backup password, and import them again on the same or another device.
 - **Up to 30 credentials:** name ≤ 32 chars, user ≤ 64, password ≤ 64.
 - **Several boards:** portrait and landscape layouts, capacitive, resistive or button-only input, and a USB or BLE keyboard.
@@ -339,6 +340,8 @@ Settings ──► Auto-lock (cycle timeout) / Ativar WiFi ──► Wi-Fi AP
 
 PIN changes first re-encrypt the stored credentials with a fresh salt into the temporary NVS namespace `pvnext`. Only after every staging write succeeds is the `pinchange` marker committed. Startup replays committed changes before accepting PIN input; interrupted staging leaves the old PIN active. If NVS lacks room for the temporary copy, the change fails and the old PIN remains valid. If committed recovery cannot complete, the display asks for a restart and keeps the vault inaccessible until recovery succeeds.
 
+Run `python3 test/test_credential_sort.py` to check sorting, favorites, usage persistence, legacy records, deletion, stable IDs and write failures with simulated storage.
+
 Run `python3 test/test_pin_change.py` to exercise the production transaction code on the host with simulated NVS write failures and power cuts. The test covers empty/full vaults, legacy PIN lengths, favorites/settings preservation and repeated recovery interruptions. Cryptography is mocked in this host test; hardware power-loss and USB/touch behavior still require device validation.
 - **Wi-Fi:** shows the SSID, password and URL of the access point.
 
@@ -429,7 +432,9 @@ const char* kbdLabel();
 | Method | Path | Purpose |
 |---|---|---|
 | GET | `/` | Single-page web app |
-| GET | `/api/list` | List credential names |
+| GET | `/api/list` | List credentials in the selected order (storage IDs preserved) |
+| GET | `/api/sort` | Get sorting preference (`mode`) |
+| POST | `/api/sort` | Save sorting preference (`mode`: `0` alphabetical, `1` newest, `2` most used) |
 | GET | `/api/get` | Get one credential |
 | POST | `/api/save` | Add or update a credential |
 | POST | `/api/del` | Delete a credential |

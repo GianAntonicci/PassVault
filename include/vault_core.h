@@ -15,6 +15,7 @@ struct Credential {
   char user[65];
   char pass[65];
   bool favorite;
+  uint32_t useCount;
 };
 
 // ---- Globals ----
@@ -26,6 +27,29 @@ uint8_t     salt[16];
 unsigned long autoLockMs = AUTOLOCK_MS;
 uint8_t displayBrightness = BRIGHTNESS_DEFAULT;
 bool storageReady = false;
+
+enum CredentialSort : uint8_t { SORT_ALPHA, SORT_RECENT, SORT_USED, SORT_COUNT };
+uint8_t credentialSort = SORT_ALPHA;
+const char* const SORT_LABELS[] = { "Alfabetica", "Mais recente", "Mais usada" };
+
+bool setCredentialSort(uint8_t mode) {
+  if (mode >= SORT_COUNT) return false;
+  if (mode == credentialSort) return true;
+  if (prefs.putUChar("sort", mode) != sizeof(uint8_t)) return false;
+  credentialSort = mode;
+  return true;
+}
+
+// Um uso por envio (Tudo/Login/Senha), sem contar visualizacoes.
+bool recordCredentialUse(int idx) {
+  if (idx < 0 || idx >= credCount) return false;
+  if (creds[idx].useCount == UINT32_MAX) return true;
+  char key[4]; snprintf(key, sizeof(key), "u%d", idx);
+  uint32_t count = creds[idx].useCount + 1;
+  if (prefs.putUInt(key, count) != sizeof(uint32_t)) return false;
+  creds[idx].useCount = count;
+  return true;
+}
 
 bool validAutoLock(unsigned long ms) {
   for (size_t i = 0; i < AUTOLOCK_OPTION_COUNT; i++)
@@ -211,7 +235,8 @@ bool ctEqual(const uint8_t* a, const uint8_t* b, size_t n) {
 // Chaves NVS: ver (formato), salt2 + pv2 (salt e verificador v2),
 //             plen (tamanho do PIN), fails (tentativas erradas),
 //             cnt, c0..cN (credenciais cifradas), m0..mN (temporarias da migracao)
-//             f0..fN (favoritas; ausente = false),
+//             f0..fN (favoritas; ausente = false), u0..uN (usos; ausente = 0),
+//             sort (ordenacao; ausente = alfabetica),
 //             salt + pin (formato v1, so em vaults antigos)
 
 #define VAULT_FORMAT  2
@@ -327,6 +352,8 @@ bool storageBegin() {
   uint8_t brightness = prefs.getUChar("brightness", BRIGHTNESS_DEFAULT);
   displayBrightness = brightness >= BRIGHTNESS_MIN && brightness <= BRIGHTNESS_MAX
                         ? brightness : BRIGHTNESS_DEFAULT;
+  uint8_t mode = prefs.getUChar("sort", SORT_ALPHA);
+  credentialSort = mode < SORT_COUNT ? mode : uint8_t(SORT_ALPHA);
   storageReady = true;
   return true;
 }
@@ -437,6 +464,8 @@ void saveSingleCred(int idx) {
   prefs.putString(key, enc);
   sprintf(key, "f%d", idx);
   prefs.putBool(key, creds[idx].favorite);
+  sprintf(key, "u%d", idx);
+  prefs.putUInt(key, creds[idx].useCount);
 }
 
 void loadCredentials() {
@@ -445,6 +474,8 @@ void loadCredentials() {
     char key[4];
     sprintf(key, "f%d", i);
     creds[i].favorite = prefs.getBool(key, false);
+    sprintf(key, "u%d", i);
+    creds[i].useCount = prefs.getUInt(key, 0);
     sprintf(key, "c%d", i);
     String enc = prefs.getString(key, "");
     if (enc.length() == 0) continue;
@@ -468,6 +499,7 @@ bool addCredential(const char* name, const char* user, const char* pass, bool fa
   strncpy(creds[credCount].user, user, 64); creds[credCount].user[64] = 0;
   strncpy(creds[credCount].pass, pass, 64); creds[credCount].pass[64] = 0;
   creds[credCount].favorite = favorite;
+  creds[credCount].useCount = 0;
   saveSingleCred(credCount);
   credCount++;
   prefs.putInt("cnt", credCount);
@@ -494,12 +526,29 @@ bool setCredentialFavorite(int idx, bool favorite) {
 }
 
 // Ordenacao apenas para exibicao: IDs de armazenamento continuam estaveis.
+// Favoritas primeiro em todos os modos. O indice preserva a ordem de cadastro,
+// inclusive apos exclusoes; editar nao transforma uma conta em cadastro recente.
+bool credentialComesBefore(int a, int b) {
+  if (creds[a].favorite != creds[b].favorite) return creds[a].favorite;
+  if (credentialSort == SORT_RECENT) return a > b;
+  if (credentialSort == SORT_USED && creds[a].useCount != creds[b].useCount)
+    return creds[a].useCount > creds[b].useCount;
+  int byName = strcasecmp(creds[a].name, creds[b].name);
+  return byName != 0 ? byName < 0 : a < b;
+}
+
 int credentialDisplayIndex(int position) {
   if (position < 0 || position >= credCount) return -1;
-  for (int group = 1; group >= 0; group--)
-    for (int i = 0; i < credCount; i++)
-      if (creds[i].favorite == (group != 0) && position-- == 0) return i;
-  return -1;
+  int order[MAX_CREDS];
+  for (int i = 0; i < credCount; i++) {
+    int j = i;
+    while (j > 0 && credentialComesBefore(i, order[j - 1])) {
+      order[j] = order[j - 1];
+      j--;
+    }
+    order[j] = i;
+  }
+  return order[position];
 }
 
 bool deleteCredential(int idx) {
@@ -513,6 +562,8 @@ bool deleteCredential(int idx) {
   char key[4]; sprintf(key, "c%d", credCount);
   prefs.remove(key);
   sprintf(key, "f%d", credCount);
+  prefs.remove(key);
+  sprintf(key, "u%d", credCount);
   prefs.remove(key);
   mbedtls_platform_zeroize(&creds[credCount], sizeof(Credential));
   return true;

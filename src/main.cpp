@@ -19,7 +19,7 @@ TFT_eSPI tft = TFT_eSPI();
 #include "screen_fade.h"
 
 // ---- State machine ----
-enum State { ST_PIN_SETUP, ST_PIN_CONFIRM, ST_PIN_ENTRY, ST_MENU, ST_DETAIL, ST_WEB, ST_SEARCH, ST_SETTINGS, ST_THEMES, ST_BRIGHTNESS,
+enum State { ST_PIN_SETUP, ST_PIN_CONFIRM, ST_PIN_ENTRY, ST_MENU, ST_DETAIL, ST_WEB, ST_SEARCH, ST_SETTINGS, ST_THEMES, ST_BRIGHTNESS, ST_SORT,
              ST_PIN_CURRENT, ST_PIN_NEW, ST_PIN_NEW_CONFIRM };
 State state = ST_PIN_ENTRY;
 ScreenFade screenFade;
@@ -714,6 +714,7 @@ void typeCredential(int mode) {
   if (mode == 0 || mode == 2) {
     kbdPrint(creds[selCred].pass);
   }
+  if (kbdConnected()) recordCredentialUse(selCred);
   drawTypingFeedback(kbdConnected() ? "Envio finalizado" : "Teclado desconectado",
                      kbdConnected() ? C_OK : C_WARN);
   typingFeedbackVisible = true;
@@ -838,6 +839,15 @@ void handleDetailTouch(int tx, int ty) {
 #define SETTINGS_PIN_Y   164
 #define SETTINGS_BRIGHT_Y 198
 #endif
+#ifdef USE_LANDSCAPE
+  #define SETTINGS_EXTRA_W ((SETTINGS_W - 6) / 2)
+  #define SETTINGS_SORT_X (SETTINGS_X + SETTINGS_EXTRA_W + 6)
+  #define SETTINGS_SORT_Y SETTINGS_BRIGHT_Y
+#else
+  #define SETTINGS_EXTRA_W SETTINGS_W
+  #define SETTINGS_SORT_X SETTINGS_X
+  #define SETTINGS_SORT_Y 232
+#endif
 #define SETTINGS_BACK_Y  (SCR_H - SETTINGS_H - 8)
 
 void drawSettings() {
@@ -862,7 +872,8 @@ void drawSettings() {
   btn(SETTINGS_X, SETTINGS_WIFI_Y, SETTINGS_W, SETTINGS_H, "Ativar WiFi", C_BTN);
   btn(SETTINGS_X, SETTINGS_THEME_Y, SETTINGS_W, SETTINGS_H, "Temas", C_ACCENT);
   btn(SETTINGS_X, SETTINGS_PIN_Y, SETTINGS_W, SETTINGS_H, "Alterar PIN", C_BTN);
-  btn(SETTINGS_X, SETTINGS_BRIGHT_Y, SETTINGS_W, SETTINGS_H, "Brilho", C_ACCENT);
+  btn(SETTINGS_X, SETTINGS_BRIGHT_Y, SETTINGS_EXTRA_W, SETTINGS_H, "Brilho", C_ACCENT);
+  btn(SETTINGS_SORT_X, SETTINGS_SORT_Y, SETTINGS_EXTRA_W, SETTINGS_H, "Ordenar", C_BTN);
   btn(SETTINGS_X, SETTINGS_BACK_Y, SETTINGS_W, SETTINGS_H, "Voltar", C_BTN);
   focusEnd();
 }
@@ -946,6 +957,39 @@ void handleThemesTouch(int tx, int ty) {
   }
 }
 
+void drawSort(const char* status = "", bool failed = false) {
+  beginScreen();
+  focusBegin(ST_SORT);
+  tft.fillScreen(C_BG);
+  tft.setTextColor(C_ACCENT);
+  tft.setTextDatum(TC_DATUM);
+  tft.drawString("Ordenacao", SCR_W / 2, 12, 2);
+  for (int i = 0; i < SORT_COUNT; i++) {
+    char label[24];
+    snprintf(label, sizeof(label), "%s%s", i == credentialSort ? "* " : "", SORT_LABELS[i]);
+    btn(SETTINGS_X, THEME_Y + i * THEME_STEP, SETTINGS_W, THEME_H, label, C_ACCENT);
+  }
+  tft.setTextColor(failed ? C_WARN : C_DIM);
+  tft.setTextDatum(TC_DATUM);
+  tft.drawString(status, SCR_W / 2, THEME_Y + SORT_COUNT * THEME_STEP, 2);
+  btn(SETTINGS_X, SETTINGS_BACK_Y, SETTINGS_W, SETTINGS_H, "Voltar", C_BTN);
+  focusEnd();
+}
+
+void handleSortTouch(int tx, int ty) {
+  for (int i = 0; i < SORT_COUNT; i++) {
+    if (!inBox(tx, ty, SETTINGS_X, THEME_Y + i * THEME_STEP, SETTINGS_W, THEME_H)) continue;
+    bool saved = setCredentialSort(i);
+    if (saved) menuTop = 0;
+    drawSort(saved ? "Ordem salva" : "Falha ao salvar", !saved);
+    return;
+  }
+  if (inBox(tx, ty, SETTINGS_X, SETTINGS_BACK_Y, SETTINGS_W, SETTINGS_H)) {
+    state = ST_SETTINGS;
+    drawSettings();
+  }
+}
+
 void handleSettingsTouch(int tx, int ty) {
   if (inBox(tx, ty, SETTINGS_X, SETTINGS_LOCK_Y, SETTINGS_W, SETTINGS_H)) {
     size_t next = 0;
@@ -973,9 +1017,12 @@ void handleSettingsTouch(int tx, int ty) {
   } else if (inBox(tx, ty, SETTINGS_X, SETTINGS_THEME_Y, SETTINGS_W, SETTINGS_H)) {
     state = ST_THEMES;
     drawThemes();
-  } else if (inBox(tx, ty, SETTINGS_X, SETTINGS_BRIGHT_Y, SETTINGS_W, SETTINGS_H)) {
+  } else if (inBox(tx, ty, SETTINGS_X, SETTINGS_BRIGHT_Y, SETTINGS_EXTRA_W, SETTINGS_H)) {
     state = ST_BRIGHTNESS;
     drawBrightness();
+  } else if (inBox(tx, ty, SETTINGS_SORT_X, SETTINGS_SORT_Y, SETTINGS_EXTRA_W, SETTINGS_H)) {
+    state = ST_SORT;
+    drawSort();
   } else if (inBox(tx, ty, SETTINGS_X, SETTINGS_PIN_Y, SETTINGS_W, SETTINGS_H)) {
     clearPinBuffers();
     pinLen = storagePinLen();
@@ -1054,6 +1101,7 @@ void handleBack() {
       break;
     case ST_THEMES:
     case ST_BRIGHTNESS:
+    case ST_SORT:
       state = ST_SETTINGS;
       drawSettings();
       break;
@@ -1157,7 +1205,7 @@ void loop() {
     return;
   }
 
-  if ((state == ST_MENU || state == ST_DETAIL || state == ST_SEARCH || state == ST_SETTINGS || state == ST_THEMES || state == ST_BRIGHTNESS || changingPin()) && millis() - lastAction >= autoLockMs) {
+  if ((state == ST_MENU || state == ST_DETAIL || state == ST_SEARCH || state == ST_SETTINGS || state == ST_THEMES || state == ST_BRIGHTNESS || state == ST_SORT || changingPin()) && millis() - lastAction >= autoLockMs) {
     lockDevice();
     return;
   }
@@ -1208,6 +1256,9 @@ void loop() {
       break;
     case ST_THEMES:
       handleThemesTouch(tx, ty);
+      break;
+    case ST_SORT:
+      handleSortTouch(tx, ty);
       break;
     case ST_BRIGHTNESS:
       handleBrightnessTouch(tx, ty);

@@ -129,6 +129,12 @@ input:focus{outline:none;border-color:#0ff}
     <button class="btn btn-cancel" onclick="closeForm()">Cancelar</button>
   </div>
 </div>
+<label for="sort">Ordenar por</label>
+<select id="sort" onchange="saveSort()" style="width:100%;padding:10px;margin:8px 0;background:#222;color:#eee;border:1px solid #555;border-radius:6px">
+  <option value="0">Alfab&eacute;tica</option>
+  <option value="1">Mais recente</option>
+  <option value="2">Mais usada</option>
+</select>
 <div id="list"></div>
 <button class="btn-add" onclick="openAdd()">+ Nova Credencial</button>
 <div class="backup">
@@ -152,6 +158,18 @@ function load(){
     });
     document.getElementById('list').innerHTML=h||'<p style="text-align:center;color:#666">Nenhuma credencial</p>';
   }).catch(()=>msg('Erro ao carregar',false));
+}
+function loadSort(){
+  return fetch('/api/sort').then(r=>{if(!r.ok)throw 0;return r.json()}).then(d=>{
+    document.getElementById('sort').value=String(d.mode);
+  });
+}
+function saveSort(){
+  const select=document.getElementById('sort');select.disabled=true;
+  fetch('/api/sort',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
+    body:'mode='+select.value}).then(r=>{if(!r.ok)throw 0;return r.json()}).then(()=>load())
+    .catch(()=>{msg('Erro ao salvar ordem',false);return loadSort()})
+    .catch(()=>msg('Erro ao carregar ordem',false)).finally(()=>{select.disabled=false});
 }
 function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
 function showDetail(id){
@@ -247,7 +265,7 @@ function doImport(inp){const f=inp.files[0];inp.value='';if(!f)return;
     else msg(d.err==='pw'?'Senha do backup incorreta':'Arquivo inv\u00e1lido',false);
   }).catch(()=>msg('Arquivo inv\u00e1lido',false));
 }
-load();
+loadSort().then(()=>load()).catch(()=>msg('Erro ao carregar ordem',false));
 </script>
 </body>
 </html>
@@ -273,6 +291,22 @@ void handleList() {
   }
   json += "]";
   server.send(200, "application/json", json);
+}
+
+void handleSortGet() {
+  webTouch();
+  server.send(200, "application/json", "{\"mode\":" + String(credentialSort) + "}");
+}
+
+void handleSortSave() {
+  webTouch();
+  String mode = server.arg("mode");
+  if (mode.length() != 1 || mode[0] < '0' || mode[0] >= '0' + SORT_COUNT) {
+    server.send(400, "application/json", "{\"ok\":false}");
+    return;
+  }
+  bool ok = setCredentialSort(mode[0] - '0');
+  server.send(ok ? 200 : 500, "application/json", ok ? "{\"ok\":true}" : "{\"ok\":false}");
 }
 
 void handleGet() {
@@ -387,6 +421,8 @@ void startWeb() {
   webLastRequest = millis();
   server.on("/",          handleRoot);
   server.on("/api/list",  handleList);
+  server.on("/api/sort", HTTP_GET, handleSortGet);
+  server.on("/api/sort", HTTP_POST, handleSortSave);
   server.on("/api/get",   handleGet);
   server.on("/api/save",  HTTP_POST, handleSave);
   server.on("/api/favorite", HTTP_POST, handleFavorite);
