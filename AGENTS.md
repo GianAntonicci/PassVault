@@ -2,6 +2,13 @@
 
 Context instructions for any AI or developer working on this project.
 
+## Git usage by agents
+
+- Use Git only when the user explicitly requests Git operations. This applies to read-only commands (such as `status`, `diff` and `log`), local changes (such as branches, commits and merges), and remote operations (such as fetch, pull, push and pull requests).
+- A request to implement, review, test or fix code does not authorize Git usage. Without an explicit Git request, inspect and edit files and run builds directly without invoking Git or GitHub repository tools.
+- When the user requests a Git workflow, perform the operations necessary to complete that workflow within the requested scope. Use semantic commit messages (Conventional Commits), such as `feat: ...`, `fix: ...` and `docs: ...`.
+- Never infer authorization for a force push, history rewrite, branch deletion or merging a pull request from a request to commit, push or open a pull request.
+
 ## Overview
 
 PassVault is a hardware password manager running on ESP32 boards. It stores encrypted credentials in NVS (flash), unlocks with a 6-digit PIN, and types login/password into a computer by emulating a keyboard (USB HID on ESP32-S3, BLE on classic ESP32). Credentials are managed through a web interface served on a temporary WiFi Access Point.
