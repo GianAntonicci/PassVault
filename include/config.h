@@ -32,43 +32,8 @@
   #define TOUCH_DEBOUNCE  0    // botoes ja tem debounce proprio em input.h
   #define KBD_USB_HID
 
-#elif defined(BOARD_CYD)
-  #define BOARD_NAME      "CYD 2432S028"
-  #define SCR_W           240
-  #define SCR_H           320
-  #define TFT_ROTATION    2    // retrato com as entradas USB para baixo
-  #define PIN_POWER_ON    -1
-  // XPT2046 em barramento SPI separado (VSPI)
-  #define XPT_CLK         25
-  #define XPT_MISO        39
-  #define XPT_MOSI        32
-  #define XPT_CS          33
-  #define XPT_IRQ         36
-  // Faixa crua do ADC — ajuste se o toque estiver deslocado
-  // Rotacao 2 do XPT2046: X = Y original, Y = 4095 - X original.
-  #define XPT_X_MIN       240
-  #define XPT_X_MAX       3800
-  #define XPT_Y_MIN       395
-  #define XPT_Y_MAX       3895
-  #define TOUCH_DEBOUNCE  300
-  #define KBD_BLE
-  #define MENU_SCROLL_BTNS   // touch resistivo sem gesto: botoes de rolagem no menu
-
-#elif defined(BOARD_GENERIC_ILI9341)
-  #define BOARD_NAME      "ESP32 + ILI9341"
-  #define SCR_W           320
-  #define SCR_H           240
-  #define TFT_ROTATION    1
-  #define USE_LANDSCAPE
-  #define PIN_POWER_ON    -1
-  // Calibracao do XPT2046 (gere com o exemplo TFT_eSPI "Touch_calibrate")
-  #define TOUCH_CAL_DATA  { 300, 3500, 300, 3500, 1 }
-  #define TOUCH_DEBOUNCE  300
-  #define KBD_BLE
-  #define MENU_SCROLL_BTNS   // touch resistivo sem gesto: botoes de rolagem no menu
-
 #else
-  #error "Defina uma placa: -DBOARD_TDISPLAY_S3_TOUCH, -DBOARD_TDISPLAY_S3, -DBOARD_CYD ou -DBOARD_GENERIC_ILI9341"
+  #error "Defina uma placa: -DBOARD_TDISPLAY_S3_TOUCH, -DBOARD_TDISPLAY_S3"
 #endif
 
 // =====================================================================
@@ -105,9 +70,6 @@ constexpr size_t AUTOLOCK_OPTION_COUNT = sizeof(AUTOLOCK_OPTIONS_MS) / sizeof(AU
 #define AP_SSID          "PassVault"
 #define AP_PASS_LEN      10
 #define WEB_IDLE_MS      300000
-
-// Nome anunciado pelo teclado BLE
-#define BLE_KBD_NAME  "PassVault"
 
 // Paletas RGB565. A ordem tambem identifica o tema salvo na NVS.
 struct ColorTheme {

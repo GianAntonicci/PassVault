@@ -11,7 +11,7 @@ Context instructions for any AI or developer working on this project.
 
 ## Overview
 
-PassVault is a hardware password manager running on ESP32 boards. It stores encrypted credentials in NVS (flash), unlocks with a 6-digit PIN, and types login/password into a computer by emulating a keyboard (USB HID on ESP32-S3, BLE on classic ESP32). Credentials are managed through a web interface served on a temporary WiFi Access Point.
+PassVault is a hardware password manager running on ESP32-S3 boards with native USB HID. It stores encrypted credentials in NVS (flash), unlocks with a 6-digit PIN, and types login/password into a computer by emulating a keyboard (native USB HID). Credentials are managed through a web interface served on a temporary WiFi Access Point.
 
 ## Tech stack
 
@@ -22,7 +22,6 @@ PassVault is a hardware password manager running on ESP32 boards. It stores encr
 - **Encryption:** mbedTLS (AES-256-CBC, PBKDF2-HMAC-SHA256)
 - **Storage:** NVS (Preferences.h)
 - **USB HID:** TinyUSB (native on ESP32-S3)
-- **BLE Keyboard:** ESP32 BLE Keyboard (classic ESP32)
 
 ## Supported boards
 
@@ -30,9 +29,6 @@ PassVault is a hardware password manager running on ESP32 boards. It stores encr
 |--------------------------|---------------------------|--------------------|----------------------|----------|
 | `tdisplay-s3-touch`      | LilyGO T-Display S3 Touch | ST7789 170×320 parallel 8-bit | CST816S (capacitive touch) | USB HID |
 | `tdisplay-s3`            | LilyGO T-Display S3       | ST7789 170×320 parallel 8-bit | 2 physical buttons (GPIO 0, 14) | USB HID |
-| `cyd-2432s028`           | CYD ESP32-2432S028 (1 USB) | ILI9341 240×320 SPI | XPT2046 (resistive touch) | BLE |
-| `cyd-2432s028-2usb`      | CYD ESP32-2432S028 (2 USB) | ILI9341_2 240×320 SPI, inverted | XPT2046 (resistive touch) | BLE |
-| `generic-ili9341`        | Generic ESP32 + ILI9341    | ILI9341 240×320 SPI | XPT2046 (resistive touch) | BLE |
 
 To build for a specific board: `pio run -e <environment>`
 To upload: `pio run -e <environment> --target upload`
@@ -43,12 +39,10 @@ To upload: `pio run -e <environment> --target upload`
 PassVault/
 ├── include/
 │   ├── config.h          # Board profiles, constants, RGB565 colors
-│   ├── input.h           # Input abstraction (capacitive/resistive touch, buttons)
-│   ├── keyboard.h        # Keyboard abstraction (USB HID / BLE)
+│   ├── input.h           # Input abstraction (capacitive touch, buttons)
+│   ├── keyboard.h        # Native USB HID keyboard
 │   ├── vault_core.h      # AES-256-CBC encryption, PBKDF2, NVS storage
 │   └── vault_web.h       # WiFi AP, WebServer, HTML SPA, REST API
-├── scripts/
-│   └── patch_blekeyboard.py  # Pre-build script to fix BLE Keyboard on core 3.x
 ├── src/
 │   └── main.cpp          # UI (TFT_eSPI), state machine, numpad, menus
 ├── platformio.ini        # Multi-board config with TFT_eSPI build_flags
@@ -76,8 +70,8 @@ ST_PIN_ENTRY  →  ST_MENU  →  ST_DETAIL
 
 ### Abstraction layers
 
-- **input.h** — Unified interface: `inputBegin()`, `inputRead(x, y, gesture)`. Each board implements its own backend (CST816S, XPT2046, GPIO buttons). Supported gestures: tap, swipe up/down, back. Focus system for button-only boards.
-- **keyboard.h** — Unified interface: `kbdBegin()`, `kbdPrint()`, `kbdWrite()`, `kbdConnected()`. Compiles to USB HID or BLE depending on the `KBD_USB_HID` or `KBD_BLE` macro defined in platformio.ini.
+- **input.h** — Unified interface: `inputBegin()`, `inputRead(x, y, gesture)`. Each board implements its own backend (CST816S, GPIO buttons). Supported gestures: tap, swipe up/down, back. Focus system for button-only boards.
+- **keyboard.h** — Unified interface: `kbdBegin()`, `kbdPrint()`, `kbdWrite()`, `kbdConnected()`. Uses native USB HID on both supported ESP32-S3 boards (`KBD_USB_HID` in config.h).
 - **vault_core.h** — All encryption and persistence. AES key derived via PBKDF2-HMAC-SHA256 (20k iterations) from PIN + salt. Each credential is individually encrypted with a random IV. Storage format: `name|user|pass` → AES-256-CBC → hex string in NVS.
 - **vault_web.h** — WiFi AP with random 10-character password, WebServer with SPA in PROGMEM. REST API: `GET /api/list`, `GET /api/get?id=N`, `POST /api/save`, `POST /api/del?id=N`, `POST /api/export`, `POST /api/import` (encrypted JSON backup protected by a separate backup password). Limit of 1 client, auto-shutdown after 5 min idle.
 
@@ -85,9 +79,7 @@ ST_PIN_ENTRY  →  ST_MENU  →  ST_DETAIL
 
 Layout is selected at compile time:
 - **Portrait (170×320)**: T-Display S3 / T-Display S3 Touch
-- **Portrait (240×320)**: CYD (both versions)
-- **Landscape (320×240)**: Generic ILI9341
-- **`MENU_SCROLL_BTNS`**: On-screen scroll buttons for boards without swipe (CYD, generic, buttons)
+- **`MENU_SCROLL_BTNS`**: On-screen scroll buttons for boards without swipe (T-Display S3 with buttons)
 
 ## Security
 
@@ -120,17 +112,17 @@ Layout is selected at compile time:
 
 1. Create a new `BOARD_*` profile in `config.h` with pins, screen size, and input/keyboard type
 2. Add the input backend in `input.h` with `#ifdef BOARD_*`
-3. Check if `keyboard.h` covers the type (USB HID or BLE) — if not, add it
-4. Define layout (portrait/landscape) and whether it needs `MENU_SCROLL_BTNS`
+3. Require native USB HID support and define `KBD_USB_HID`; boards needing an external keyboard module are not supported
+4. Adapt the portrait layout if needed and select whether it needs `MENU_SCROLL_BTNS`
 5. Create a new `[env:name]` in `platformio.ini` with the correct TFT_eSPI `build_flags`
-6. Test: PIN setup → PIN entry → add credential via web → type via HID/BLE
+6. Test: PIN setup → PIN entry → add credential via web → type via USB HID
 
 ## How to add a new feature
 
 - Storage/crypto features go in `vault_core.h`
 - Web API/UI features go in `vault_web.h`
 - Screen/interaction features go in `main.cpp`
-- Maintain compatibility with all 4 boards (use `#ifdef` when needed)
+- Maintain compatibility with both supported boards (use `#ifdef` when needed)
 - New API endpoints must be registered in `startWeb()` inside `vault_web.h`
 - Credential limits: name 32 chars, user/pass 64 chars, max 30 credentials
 
@@ -153,8 +145,6 @@ pio device monitor -b 115200
 
 - `bodmer/TFT_eSPI` — Display (all boards)
 - `fbiego/CST816S` — Capacitive touch (T-Display S3 Touch only)
-- `t-vk/ESP32 BLE Keyboard` — BLE keyboard (classic ESP32 only)
-- `paulstoffregen/XPT2046_Touchscreen` — Resistive touch (CYD only)
 
 ## Links
 
