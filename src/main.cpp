@@ -460,9 +460,16 @@ void drawMenu() {
   } else {
     for (int i = menuTop; i < filtCount && i < menuTop + visible; i++) {
       tft.fillRoundRect(4, y, MENU_ITEM_W, MENU_ITEM_H - 2, 4, C_CARD);
+      uint8_t category = creds[filt[i]].category;
+      tft.fillRect(6, y + 4, 3, MENU_ITEM_H - 10, C_CATEGORY[category]);
       tft.setTextColor(C_TEXT);
       tft.setTextDatum(TL_DATUM);
-      tft.drawString(String(creds[filt[i]].favorite ? "* " : "") + creds[filt[i]].name, 12, y + 7, 2);
+      String label = String(creds[filt[i]].favorite ? "* " : "") + creds[filt[i]].name;
+      while (label.length() && tft.textWidth(label, 2) > MENU_ITEM_W - 16)
+        label.remove(label.length() - 1);
+      tft.drawString(label, 12, y + 1, 2);
+      tft.setTextColor(C_CATEGORY[category]);
+      tft.drawString(CATEGORY_LABELS[category], 12, y + 19, 1);
       // Bordas da lista rolam ao inves de mover o foco
       uint8_t flags = 0;
       if (i == menuTop && menuTop > 0) flags |= FOCUS_SCROLL_UP;

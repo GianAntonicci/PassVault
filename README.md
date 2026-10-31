@@ -18,8 +18,9 @@ It is a PlatformIO project with one firmware and a build environment for each su
 - **Wi-Fi management:** an on-demand Wi-Fi access point with a single-page web app to list, add, edit and delete credentials. Each time it is turned on it gets a **new random password**, accepts only one client, and shuts down after 5 minutes without use.
 - **Search by name:** filter the menu list with an on-screen A–Z/0–9 keyboard. Matching ignores case and finds the text anywhere in the name.
 - **Password generator:** the web UI creates random passwords with a chosen length and character types.
-- **Favorites:** mark frequently used credentials with **Favoritar** on the device or web detail screen. Favorites appear first, including in search results, and survive locking and rebooting. Use **Desmarcar** to remove the mark.
-- **Credential sorting:** select **Config. → Ordenar** on the device or **Ordenar por** in the web UI. Choose **Alfabética** (default, ignores letter case), **Mais recente** (newest registrations first; edits keep their original position) or **Mais usada** (highest keyboard-send count first, with alphabetical ties). Favorites stay first in every mode, including search results. The same preference applies to the device and web list and survives restarts. Each completed *All/Login/Password/Entrar* send while the keyboard remains connected counts once; viewing a credential does not count. Existing credentials start with zero uses. Usage counters remain on the device and are reset for imported credentials; backups retain their existing format and do not include the sorting preference or usage history.
+- **Favorites:** mark frequently used credentials with **Favoritar** on the device or web detail screen. Favorites appear first (within each category when grouped by type), including in search results, and survive locking and rebooting. Use **Desmarcar** to remove the mark.
+- **Credential sorting:** select **Config. → Ordenar** on the device or **Ordenar por** in the web UI. Choose **Alfabética** (default, ignores letter case), **Mais recente** (newest registrations first; edits keep their original position) or **Mais usada** (highest keyboard-send count first, with alphabetical ties). Favorites stay first in these modes, including search results. **Por tipo** groups credentials by category, with favorites first within each group and **Sem tipo** last. The same preference applies to the device and web list and survives restarts. Each completed *All/Login/Password/Entrar* send while the keyboard remains connected counts once; viewing a credential does not count. Existing credentials start with zero uses. Usage counters remain on the device and are reset for imported credentials; backups do not include the sorting preference or usage history.
+- **Credential types:** choose **Redes Sociais** (purple), **Email** (cyan), **Banco** (green), **Trabalho** (yellow), or **Sem tipo** (gray) when adding or editing a credential in the web UI. Colored markers and text labels identify types on the device and web list. Select **Por tipo** under **Config. → Ordenar** or web **Ordenar por** to group them. The preference and categories survive restarts and PIN changes. Existing credentials default to **Sem tipo**. Category metadata is stored in NVS alongside favorites and usage counts; in backups it is encrypted.
 - **Encrypted backup:** export all credentials to a JSON file protected by a backup password, and import them again on the same or another device.
 - **Up to 30 credentials:** name ≤ 32 chars, user ≤ 64, password ≤ 64.
 - **Native USB boards:** T-Display S3 / S3 Touch, T-Display S3 AMOLED Touch (1.91″), and compact Waveshare ESP32-S3 touch profiles (1.47″, 1.54″, 1.64″, 1.69″ and 1.83″). Every profile uses USB HID without an external keyboard module; all newly added profiles still require hardware validation.
@@ -242,13 +243,13 @@ Imported credentials are **added** to the vault. A credential with the same name
 The backup password is separate from the PIN, so a backup can be restored after changing the PIN, after a vault wipe, or on another board. The encryption runs on the device, because browsers block Web Crypto on plain-HTTP pages. The file format is:
 
 ```json
-{"app":"PassVault","v":2,"iter":20000,"salt":"<hex>","ver":"<hex>","mac":"<hex>","creds":["<hex>", "..."]}
+{"app":"PassVault","v":3,"iter":20000,"salt":"<hex>","ver":"<hex>","mac":"<hex>","creds":["<hex>", "..."]}
 ```
 
 - The backup key is derived with **PBKDF2-HMAC-SHA256** (`iter` rounds) from the backup password and a new random 16-byte `salt` on each export.
-- Each v2 `creds` entry is `favorite|name|user|pass` (`favorite` is `0` or `1`), encrypted with **AES-256-CBC** and a random IV (IV + ciphertext, hex).
-- Favorites are preserved in backups. Legacy v1 backups (`name|user|pass`) remain importable; their credentials start without favorites. Use the updated firmware to import v2 backups.
-- `ver` checks the password, and `mac` (**HMAC-SHA256** over `2,`, the salt and all entries in v2; the salt and entries in v1) detects a damaged or modified file.
+- Each v3 `creds` entry is `category|favorite|name|user|pass` (`category`: `0` Sem tipo, `1` Redes Sociais, `2` Email, `3` Banco, `4` Trabalho; `favorite`: `0` or `1`), encrypted with **AES-256-CBC** and a random IV (IV + ciphertext, hex).
+- Types and favorites are preserved in v3 backups. Legacy v1 (`name|user|pass`) and v2 (`favorite|name|user|pass`) backups remain importable and default to **Sem tipo**; v1 credentials also start without favorites. Firmware supporting v3 is required to restore new backups.
+- `ver` checks the password, and `mac` (**HMAC-SHA256** over `3,`, the salt and all entries in v3; `2,` plus salt and entries in v2; salt and entries in v1) detects a damaged or modified file.
 
 > Anyone who has the file can try to guess the backup password offline. Use a long, unique password and keep the file somewhere safe.
 
@@ -338,7 +339,9 @@ Run `python3 test/test_touch_gesture.py` to exercise tap/hold behavior, release 
 
 Run `python3 test/test_credential_typing.py` to check the keyboard sequences, disconnected-host behavior, usage counting and button bounds for all supported display layouts.
 
-Run `python3 test/test_credential_sort.py` to check sorting, favorites, usage persistence, legacy records, deletion, stable IDs and write failures with simulated storage.
+Run `python3 test/test_credential_sort.py` to check sorting, favorites, usage persistence, legacy records, deletion, stable IDs, types, grouping, write failures and backup v1/v2/v3 compatibility with simulated storage and mocked crypto.
+
+Run `node test/test_web_categories.js` to check web grouping, colored labels, type editing, escaping, save failures and backup version support with simulated DOM and API responses.
 
 Run `python3 test/test_pin_change.py` to exercise the production transaction code on the host with simulated NVS write failures and power cuts. The test covers empty/full vaults, legacy PIN lengths, favorites/settings preservation and repeated recovery interruptions. Cryptography is mocked in this host test; hardware power-loss and USB/touch behavior still require device validation.
 - **Wi-Fi:** shows the SSID, password and URL of the access point.
@@ -429,11 +432,11 @@ const char* kbdLabel();
 | Method | Path | Purpose |
 |---|---|---|
 | GET | `/` | Single-page web app |
-| GET | `/api/list` | List credentials in the selected order (storage IDs preserved) |
+| GET | `/api/list` | List credentials with numeric `category` in the selected order (storage IDs preserved) |
 | GET | `/api/sort` | Get sorting preference (`mode`) |
-| POST | `/api/sort` | Save sorting preference (`mode`: `0` alphabetical, `1` newest, `2` most used) |
-| GET | `/api/get` | Get one credential |
-| POST | `/api/save` | Add or update a credential |
+| POST | `/api/sort` | Save sorting preference (`mode`: `0` alphabetical, `1` newest, `2` most used, `3` grouped by type) |
+| GET | `/api/get` | Get one credential, including numeric `category` |
+| POST | `/api/save` | Add or update a credential (`category`: `0` none, `1` social, `2` email, `3` bank, `4` work; omitted preserves the type on edit or defaults to none on add) |
 | POST | `/api/del` | Delete a credential |
 | POST | `/api/favorite` | Set favorite status (`id`, `favorite` = `0` or `1`) |
 | POST | `/api/export` | Download an encrypted backup (`pw` = backup password) |

@@ -109,6 +109,7 @@ void seed(int n, int oldLength) {
   for (int i = 0; i < n; ++i) {
     prefs.putString(("c" + std::to_string(i)).c_str(), encryptData(("Conta" + std::to_string(i) + "|user|secret").c_str()));
     prefs.putBool(("f" + std::to_string(i)).c_str(), i % 2);
+    prefs.putUChar(("t" + std::to_string(i)).c_str(), i % 5);
   }
   writes = 0;
 }
@@ -125,6 +126,7 @@ void assertVault(int n, int oldLength) {
     auto id = std::to_string(i);
     assert(decryptData(prefs.getString(("c" + id).c_str()), k) == "Conta" + id + "|user|secret");
     assert(prefs.getBool(("f" + id).c_str()) == bool(i % 2));
+    assert(prefs.getUChar(("t" + id).c_str()) == i % 5);
   }
 }
 int main() {

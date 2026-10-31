@@ -55,6 +55,7 @@ public:
   void fillScreen(uint32_t color) { dirty = true; canvas.fillSprite(color); }
   template <typename... Args> void setTextColor(Args... args) { canvas.setTextColor(args...); }
   void setTextDatum(uint8_t datum) { canvas.setTextDatum(datum); }
+  int16_t textWidth(const String& text, uint8_t font) { return canvas.textWidth(text, font); }
 #define VAULT_DRAW_METHOD(name) \
   template <typename... Args> auto name(Args... args) { \
     dirty = true; return canvas.name(args...); \

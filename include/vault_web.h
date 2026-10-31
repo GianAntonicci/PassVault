@@ -10,8 +10,8 @@ using namespace fs;
 // ---- extern from vault_core.h ----
 extern Credential creds[];
 extern int        credCount;
-extern bool addCredential(const char*, const char*, const char*, bool);
-extern bool updateCredential(int, const char*, const char*, const char*);
+extern bool addCredential(const char*, const char*, const char*, bool, uint8_t);
+extern bool updateCredential(int, const char*, const char*, const char*, uint8_t);
 extern bool deleteCredential(int);
 
 WebServer server(80);
@@ -59,9 +59,12 @@ h1{text-align:center;color:#0ff;margin-bottom:18px;font-size:1.5em}
       margin-bottom:10px;cursor:pointer;transition:background .2s}
 .card:hover{background:#16213e}
 .card .name{font-weight:bold;color:#0f0;font-size:1.1em}
+.type{font-size:.8em;margin-top:5px;color:var(--type-color)}
+.group{margin:16px 0 8px;font-size:1em;color:#eee}
 .card .user{color:#aaa;font-size:.85em;margin-top:2px}
 #form-area{display:none;background:#1a1a2e;border:1px solid #333;
            border-radius:10px;padding:16px;margin-bottom:14px}
+select{width:100%;padding:10px;margin:6px 0;background:#222;color:#eee;border:1px solid #444;border-radius:6px;font-size:1em}
 input{width:100%;padding:10px;margin:6px 0;border:1px solid #444;
       border-radius:6px;background:#222;color:#eee;font-size:1em}
 input:focus{outline:none;border-color:#0ff}
@@ -101,6 +104,7 @@ input:focus{outline:none;border-color:#0ff}
 <div id="msg"></div>
 <div id="detail" class="detail-area">
   <div class="field"><div class="label">Nome</div><div class="value" id="d-name"></div></div>
+  <div class="field"><div class="label">Tipo</div><div class="value" id="d-category"></div></div>
   <div class="field"><div class="label">Usu&aacute;rio</div><div class="value" id="d-user"></div></div>
   <div class="field"><div class="label">Senha</div><div class="value" id="d-pass"></div></div>
   <div style="margin-top:12px;text-align:center">
@@ -123,6 +127,14 @@ input:focus{outline:none;border-color:#0ff}
     <label><input type="checkbox" id="g-num" checked>0-9</label>
     <label><input type="checkbox" id="g-sym" checked>S&iacute;mbolos</label>
   </div>
+  <label for="f-category">Tipo</label>
+  <select id="f-category">
+    <option value="0">Sem tipo</option>
+    <option value="1">Redes Sociais</option>
+    <option value="2">Email</option>
+    <option value="3">Banco</option>
+    <option value="4">Trabalho</option>
+  </select>
   <input type="hidden" id="f-id" value="-1">
   <div style="text-align:center;margin-top:8px">
     <button class="btn btn-ok" onclick="saveCred()">Salvar</button>
@@ -134,6 +146,7 @@ input:focus{outline:none;border-color:#0ff}
   <option value="0">Alfab&eacute;tica</option>
   <option value="1">Mais recente</option>
   <option value="2">Mais usada</option>
+  <option value="3">Por tipo</option>
 </select>
 <div id="list"></div>
 <button class="btn-add" onclick="openAdd()">+ Nova Credencial</button>
@@ -146,15 +159,23 @@ input:focus{outline:none;border-color:#0ff}
   <input type="file" id="b-file" accept=".json,application/json" style="display:none" onchange="doImport(this)">
 </div>
 <script>
-let selId=-1,selFavorite=false;
+let selId=-1,selFavorite=false,selCategory=0;
+const types=['Sem tipo','Redes Sociais','Email','Banco','Trabalho'];
+const typeColors=['#bdbdbd','#c080ff','#00ffff','#00ff00','#ffff00'];
 function msg(t,ok){const m=document.getElementById('msg');m.textContent=t;
   m.className=ok?'ok-msg':'err-msg';m.style.display='block';
   setTimeout(()=>m.style.display='none',2500)}
 function load(){
   fetch('/api/list').then(r=>r.json()).then(d=>{
-    let h='';d.forEach(c=>{
-      h+='<div class="card" onclick="showDetail('+c.id+')"><div class="name">'+
-        (c.favorite?'&#9733; ':'')+esc(c.name)+'</div><div class="user">'+esc(c.user)+'</div></div>';
+    let h='',previous=-1;d.forEach(c=>{
+      const type=Number.isInteger(c.category)&&c.category>=0&&c.category<types.length?c.category:0;
+      if(document.getElementById('sort').value==='3'&&previous!==type){
+        h+='<h2 class="group">'+types[type]+'</h2>';previous=type;
+      }
+      h+='<div class="card" style="border-left:4px solid '+typeColors[type]+
+        ';--type-color:'+typeColors[type]+'" onclick="showDetail('+c.id+')"><div class="name">'+
+        (c.favorite?'&#9733; ':'')+esc(c.name)+'</div><div class="user">'+esc(c.user)+
+        '</div><div class="type">'+types[type]+'</div></div>';
     });
     document.getElementById('list').innerHTML=h||'<p style="text-align:center;color:#666">Nenhuma credencial</p>';
   }).catch(()=>msg('Erro ao carregar',false));
@@ -174,7 +195,9 @@ function saveSort(){
 function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
 function showDetail(id){
   fetch('/api/get?id='+id).then(r=>r.json()).then(c=>{
-    selId=id;selFavorite=c.favorite;
+    selId=id;selFavorite=c.favorite;selCategory=c.category;
+    document.getElementById('d-category').textContent=types[selCategory];
+    document.getElementById('d-category').style.color=typeColors[selCategory];
     document.getElementById('d-favorite').textContent=c.favorite?'Desmarcar favorita':'Favoritar';
     document.getElementById('d-favorite').setAttribute('aria-pressed',String(c.favorite));
     document.getElementById('d-name').textContent=c.name;
@@ -198,6 +221,7 @@ function editCred(){
   document.getElementById('f-user').value=document.getElementById('d-user').textContent;
   document.getElementById('f-pass').value=document.getElementById('d-pass').textContent;
   document.getElementById('f-id').value=selId;
+  document.getElementById('f-category').value=selCategory;
   document.getElementById('form-area').style.display='block';
   document.getElementById('detail').style.display='none';
 }
@@ -211,6 +235,7 @@ function openAdd(){
   document.getElementById('f-user').value='';
   document.getElementById('f-pass').value='';
   document.getElementById('f-id').value=-1;
+  document.getElementById('f-category').value='0';
   document.getElementById('form-area').style.display='block';
   document.getElementById('detail').style.display='none';
 }
@@ -236,9 +261,9 @@ function saveCred(){
   const id=parseInt(document.getElementById('f-id').value);
   if(!n||!u||!p){msg('Preencha todos',false);return}
   const body='id='+id+'&name='+encodeURIComponent(n)+'&user='+
-    encodeURIComponent(u)+'&pass='+encodeURIComponent(p);
+    encodeURIComponent(u)+'&pass='+encodeURIComponent(p)+'&category='+document.getElementById('f-category').value;
   fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body})
-    .then(r=>r.json()).then(d=>{msg(d.ok?'Salvo':'Erro',d.ok);closeForm();load();
+    .then(r=>r.json()).then(d=>{if(!d.ok)throw 0;msg('Salvo',true);closeForm();load();
   }).catch(()=>msg('Erro',false));
 }
 function backupPw(){const p=document.getElementById('b-pw').value;
@@ -254,7 +279,7 @@ function doExport(){const p=backupPw();if(!p)return;msg('Gerando...',true);
 function doImport(inp){const f=inp.files[0];inp.value='';if(!f)return;
   const p=backupPw();if(!p)return;
   f.text().then(t=>{const j=JSON.parse(t);
-    if(j.app!=='PassVault'||(j.v!==1&&j.v!==2)||!Array.isArray(j.creds))throw 0;
+    if(j.app!=='PassVault'||(j.v!==1&&j.v!==2&&j.v!==3)||!Array.isArray(j.creds))throw 0;
     let body='pw='+encodeURIComponent(p)+'&v='+j.v+'&iter='+j.iter+'&salt='+j.salt+'&ver='+j.ver+
       '&mac='+j.mac+'&n='+j.creds.length;
     j.creds.forEach((c,i)=>body+='&c'+i+'='+encodeURIComponent(c));
@@ -286,6 +311,7 @@ void handleList() {
     if (position) json += ",";
     json += "{\"id\":" + String(i) + ",\"favorite\":" +
             (creds[i].favorite ? "true" : "false") +
+            ",\"category\":" + String(creds[i].category) +
             ",\"name\":\"" + jsonEsc(creds[i].name) +
             "\",\"user\":\"" + jsonEsc(creds[i].user) + "\"}";
   }
@@ -317,7 +343,8 @@ void handleGet() {
   String json = "{\"name\":\"" + jsonEsc(creds[id].name) +
                 "\",\"user\":\"" + jsonEsc(creds[id].user) +
                 "\",\"pass\":\"" + jsonEsc(creds[id].pass) + "\",\"favorite\":" +
-                (creds[id].favorite ? "true" : "false") + "}";
+                (creds[id].favorite ? "true" : "false") +
+                ",\"category\":" + String(creds[id].category) + "}";
   server.send(200, "application/json", json);
 }
 
@@ -332,11 +359,21 @@ void handleSave() {
   String pass = server.arg("pass");
   int id = server.hasArg("id") ? server.arg("id").toInt() : -1;
 
+  uint8_t category = CATEGORY_COUNT;
+  if (server.hasArg("category")) {
+    String value = server.arg("category");
+    if (value.length() != 1 || value[0] < '0' || value[0] >= '0' + CATEGORY_COUNT) {
+      server.send(400, "application/json", "{\"ok\":false}");
+      return;
+    }
+    category = value[0] - '0';
+  }
   bool ok;
   if (id >= 0 && id < credCount) {
-    ok = updateCredential(id, name.c_str(), user.c_str(), pass.c_str());
+    ok = updateCredential(id, name.c_str(), user.c_str(), pass.c_str(), category);
   } else {
-    ok = addCredential(name.c_str(), user.c_str(), pass.c_str());
+    ok = addCredential(name.c_str(), user.c_str(), pass.c_str(), false,
+                       category == CATEGORY_COUNT ? uint8_t(CATEGORY_NONE) : category);
   }
   server.send(200, "application/json", ok ? "{\"ok\":true}" : "{\"ok\":false}");
 }
