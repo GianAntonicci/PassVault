@@ -20,12 +20,12 @@ void syncEncode(uint8_t* data) {
   }
 }
 
-bool syncValidField(const uint8_t* p, size_t n, bool required) {
+bool syncValidField(const uint8_t* p, size_t n, bool required, bool allowPipe = false) {
   const uint8_t* end = (const uint8_t*)memchr(p, 0, n);
   if (!end || (required && end == p)) return false;
   // The local storage format uses | as a separator.
   for (const uint8_t* c = p; c < end; c++)
-    if (*c == '|' || *c < 32 || *c == 127) return false;
+    if (*c == '|' && !allowPipe) return false;
   return true;
 }
 
@@ -34,7 +34,7 @@ bool syncValidData(const uint8_t* data, size_t size) {
   for (int i = 0; i < data[0]; i++) {
     const uint8_t* p = data + 1 + i * SYNC_ENTRY_SIZE;
     if (!syncValidField(p, 33, true) || !syncValidField(p + 33, 65, false) ||
-        !syncValidField(p + 98, 65, false) || p[163] > 1 || p[164] >= CATEGORY_COUNT)
+        !syncValidField(p + 98, 65, false, true) || p[163] > 1 || p[164] >= CATEGORY_COUNT)
       return false;
   }
   return true;
