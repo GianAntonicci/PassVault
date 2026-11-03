@@ -18,6 +18,7 @@ It is a PlatformIO project with one firmware and a build environment for each su
 - **Auto-typing:** each credential offers *All* (user + TAB + password), *Login* (user only), *Password* (password only) or **Entrar** (user + TAB + password + ENTER, submitting the form).
 - **Wi-Fi management:** an on-demand Wi-Fi access point with a single-page web app to list, add, edit and delete credentials. Each time it is turned on it gets a **new random password**, accepts only one client, and shuts down after 5 minutes without use.
 - **Search by name:** filter the menu list with an on-screen A–Z/0–9 keyboard. Matching ignores case and finds the text anywhere in the name.
+- **Device sync:** copy new accounts directly between two unlocked PassVaults over a temporary WPA2 access point, with a 12-digit pairing code, AES-256-GCM encryption and confirmation on both devices. Existing accounts remain unchanged. See [Device-to-device sync](#device-to-device-sync).
 - **Password generator:** the web UI creates random passwords with a chosen length and character types.
 - **Favorites:** mark frequently used credentials with **Favoritar** on the device or web detail screen. Favorites appear first (within each category when grouped by type), including in search results, and survive locking and rebooting. Use **Desmarcar** to remove the mark.
 - **Credential sorting:** select **Config. → Ordenar** on the device or **Ordenar por** in the web UI. Choose **Alfabética** (default, ignores letter case), **Mais recente** (newest registrations first; edits keep their original position) or **Mais usada** (highest keyboard-send count first, with alphabetical ties). Favorites stay first in these modes, including search results. **Por tipo** groups credentials by category, with favorites first within each group and **Sem tipo** last. The same preference applies to the device and web list and survives restarts. Each completed *All/Login/Password/Entrar* send while the keyboard remains connected counts once; viewing a credential does not count. Existing credentials start with zero uses. Usage counters remain on the device and are reset for imported credentials; backups do not include the sorting preference or usage history.
@@ -232,6 +233,26 @@ Lower-case letters are always used, and the password contains at least one chara
 
 When the vault is full, new credentials are not saved.
 
+### Device-to-device sync
+
+Both devices must run firmware with sync support and have their own PIN configured. Unlock both, then:
+
+1. On the source, open **Config. → Sincronizar → Enviar**. Leave its temporary network name (`PassVault-Sync-XXXXXX`) and 12-digit code on screen.
+2. On the destination, open **Config. → Sincronizar → Receber**. Choose the matching source network; use **Proximo** if several appear, then **Usar este aparelho**. Up to six matching networks are listed; start a new session to scan again.
+3. Enter the source's code and press **Receber**. The code is separate from either device's PIN; different PINs work.
+4. On the source, press **Confirmar envio** when the destination connects.
+5. Check the result. Both devices report how many accounts were added or skipped; the source only reports success after an authenticated receipt from the destination. **Nova sessao** starts another attempt.
+
+No phone, router, Internet connection or external Wi-Fi network is required. This uses the ESP32 SoftAP/station modes, rather than Wi-Fi Direct. Sync-specific prompts currently use Portuguese. Touch and physical-button focus controls are supported.
+
+Each session copies **new accounts in one direction**. A matching name and username is skipped, even if its password, favorite flag or type differs; local accounts are never overwritten or deleted. New accounts retain passwords, favorites and types, but start with zero usage count. PINs, encryption keys, device settings and history are never transferred. To combine two vaults, repeat with the source and destination reversed. This does not resolve conflicting versions of an existing account.
+
+The complete incoming data is authenticated and validated before storage. If new accounts would exceed the 30-account limit, nothing is added. On an NVS write failure or power loss, previously completed additions remain; retrying skips them and safely resumes the remaining accounts. Check the reported counts when a failure occurs. A missing receipt may mean data was already saved on the destination; check that screen or retry.
+
+The temporary AP allows one station and uses a freshly generated 12-digit WPA2 password (about 40 bits of entropy). Independently, PBKDF2-HMAC-SHA256 derives a transfer key with a fresh 16-byte salt and 20,000 iterations. AES-256-GCM authenticates the payload, protocol version and a fresh receiver challenge; the delivery receipt is also authenticated and bound to that session and packet. Share the code only with the intended destination. Anyone who learns it during pairing can impersonate a peer; the code is not long-term device identity authentication, and a captured session permits offline code guessing.
+
+The session ends after two minutes at most. Connections and incomplete handshakes have shorter timeouts. Canceling, locking, completing or failing a transfer shuts down Wi-Fi and clears the temporary code, transfer buffers and challenge. While pairing is active, the two-minute session limit applies; choice and result screens use the configured auto-lock interval. Web management is unavailable during sync. These paths are build-tested and host-tested with simulated Wi-Fi/storage; actual radio interoperability and power-loss behavior still require testing on two physical boards.
+
 ### Backup (export & import)
 
 At the bottom of the web UI, type a **backup password** (at least 8 characters) in *Senha do backup*, then:
@@ -340,6 +361,8 @@ PIN changes first re-encrypt the stored credentials with a fresh salt into the t
 Run `python3 test/test_touch_gesture.py` to exercise tap/hold behavior, release handling, vertical swipes and drag suppression for the Waveshare touch backend.
 
 Run `python3 test/test_credential_typing.py` to check the keyboard sequences, disconnected-host behavior, usage counting and button bounds for all supported display layouts.
+
+Run `python3 test/test_vault_sync.py`, `python3 test/test_vault_sync_transport.py` and `python3 test/test_vault_sync_ui.py` to verify sync input validation, duplicate/conflict preservation, capacity checks, storage failures and retries, fragmented packets, explicit confirmation, authentication-failure handling, session cleanup and controls on every panel size. Wi-Fi, NVS and cryptography are mocked in host tests; these do not validate real radio links or the cryptographic primitives.
 
 Run `python3 test/test_credential_sort.py` to check sorting, favorites, usage persistence, legacy records, deletion, stable IDs, types, grouping, write failures and backup v1/v2/v3 compatibility with simulated storage and mocked crypto.
 
