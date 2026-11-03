@@ -20,23 +20,24 @@ support = r'''
 using std::min;
 constexpr int C_TEXT=0,C_BG=1,C_ACCENT=2,C_BTN=3,C_DIM=4,C_WARN=5,TC_DATUM=0,ST_SYNC=2,ST_SETTINGS=3;
 unsigned long autoLockMs=60000;
-enum {TXT_SETTINGS,TXT_AUTOLOCK_SECONDS,TXT_AUTOLOCK_MINUTES,TXT_TAP_CHANGE,TXT_THEMES,TXT_CHANGE_PIN,TXT_BRIGHTNESS,TXT_SORT,TXT_LANGUAGE,TXT_BACK};
-const char* tr(int) {return "";}
+#include "localization.h"
 #include "ui_layout.h"
 struct Rect {int x,y,w,h;};
 std::vector<Rect> targets;
+std::vector<std::string> labels, lines;
 struct Display {
   void fillScreen(int) {}
   void setTextColor(int,int) {}
   void setTextColor(int) {}
   void drawString(const char*,int,int,int) {}
   void setTextDatum(int) {}
-  void drawFitString(const char*,int,int y,int,int) {assert(y>=0 && y+16<=SCR_H);}
+  void drawFitString(const char* text,int,int y,int,int) {assert(y>=0 && y+16<=SCR_H);lines.push_back(text);}
 } tft;
 void beginScreen() {}
-void focusBegin(int) {targets.clear();}
+void focusBegin(int) {targets.clear();labels.clear();lines.clear();}
 void focusEnd() {}
-void btn(int x,int y,int w,int h,const char*,int) {
+void btn(int x,int y,int w,int h,const char* label,int) {
+  labels.push_back(label);
   assert(x>=0 && y>=0 && w>0 && h>0 && x+w<=SCR_W && y+h<=SCR_H);
   for(auto a:targets)assert(x+w<=a.x || a.x+a.w<=x || y+h<=a.y || a.y+a.h<=y);
   targets.push_back({x,y,w,h});
@@ -61,7 +62,24 @@ void syncConfirmSend() {if(syncPhase==SYNC_WAIT_CONFIRM && syncOffset==16){confi
 '''
 checks = r'''
 int main() {
-  drawSettings();assert(targets.size()==9);
+  for(int language=0;language<LANGUAGE_COUNT;language++) {
+    activeLanguage=language;
+    drawSettings();assert(targets.size()==9);
+    assert(std::find(labels.begin(),labels.end(),tr(TXT_SYNC))!=labels.end());
+    for(int phase=SYNC_CHOOSE;phase<=SYNC_FAILED;phase++) {
+      syncPhase=SyncPhase(phase);syncOffset=16;syncMessage=tr(TXT_SYNC_RECEIVED);
+      drawSync();assert(lines.front()==tr(TXT_SYNC));
+      assert(labels.back()==tr(phase==SYNC_CODE ? TXT_SYNC_RECEIVE : TXT_BACK));
+      if(phase==SYNC_CHOOSE) {
+        assert(labels[0]==tr(TXT_SYNC_SEND) && labels[1]==tr(TXT_SYNC_RECEIVE));
+        assert(lines[1]==tr(TXT_SYNC_ADD_NEW) && lines[2]==tr(TXT_SYNC_KEEP_EXISTING));
+      }
+      if(phase==SYNC_FINISHED || phase==SYNC_FAILED) {
+        char result[64];snprintf(result,sizeof(result),tr(TXT_SYNC_ADDED),syncAdded);
+        assert(lines[1]==tr(TXT_SYNC_RECEIVED) && lines[2]==result);
+      }
+    }
+  }
   for(int phase=SYNC_CHOOSE;phase<=SYNC_FAILED;phase++) {
     syncPhase=SyncPhase(phase);syncOffset=16;drawSync();assert(!targets.empty());
   }

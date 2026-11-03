@@ -71,7 +71,7 @@ void syncFinish(bool ok, const char* message) {
 bool syncAllocate() {
   syncWipePacket();
   syncPacket = (uint8_t*)calloc(1, SYNC_PACKET_SIZE);
-  if (!syncPacket) { syncFinish(false, "Memoria insuficiente"); return false; }
+  if (!syncPacket) { syncFinish(false, tr(TXT_SYNC_NO_MEMORY)); return false; }
   syncOffset = 0;
   return true;
 }
@@ -139,7 +139,7 @@ void syncStartSender() {
   WiFi.persistent(false);
   WiFi.mode(WIFI_AP);
   if (!WiFi.softAP(syncSsid, syncCode, 1, 0, 1)) {
-    syncFinish(false, "Falha ao criar AP"); return;
+    syncFinish(false, tr(TXT_SYNC_AP_FAILED)); return;
   }
   syncServer.begin();
   syncPhase = SYNC_AP_WAIT;
@@ -152,7 +152,7 @@ void syncStartScan() {
   WiFi.mode(WIFI_STA);
   WiFi.setAutoReconnect(false);
   int r = WiFi.scanNetworks(true);
-  if (r == WIFI_SCAN_FAILED) { syncFinish(false, "Falha na busca"); return; }
+  if (r == WIFI_SCAN_FAILED) { syncFinish(false, tr(TXT_SYNC_SCAN_FAILED)); return; }
   syncPhase = SYNC_SCANNING;
 }
 
@@ -167,12 +167,12 @@ void syncConnect() {
 
 void syncConfirmSend() {
   if (syncPhase != SYNC_WAIT_CONFIRM || syncOffset != sizeof(syncChallenge)) return;
-  if (!syncClient.connected()) { syncFinish(false, "Destino desconectado"); return; }
+  if (!syncClient.connected()) { syncFinish(false, tr(TXT_SYNC_DESTINATION_LOST)); return; }
   if (!syncAllocate()) return;
   memcpy(syncPacket, SYNC_MAGIC, 8);
   esp_fill_random(syncPacket + 8, 28); // salt and IV
   if (!syncEncode(syncPacket + SYNC_HEADER_SIZE) || !syncValidData(syncPacket + SYNC_HEADER_SIZE, SYNC_DATA_SIZE) || !syncCrypt(true)) {
-    syncFinish(false, "Falha ao cifrar dados"); return;
+    syncFinish(false, tr(TXT_SYNC_ENCRYPT_FAILED)); return;
   }
   syncProgress = millis();
   syncPhase = SYNC_SENDING;
@@ -182,12 +182,12 @@ void syncTick() {
   if (syncPhase == SYNC_OFF || syncPhase == SYNC_CHOOSE ||
       syncPhase == SYNC_FINISHED || syncPhase == SYNC_FAILED) return;
   if (millis() - syncStarted >= SYNC_SESSION_MS) {
-    syncFinish(false, "Tempo esgotado"); return;
+    syncFinish(false, tr(TXT_SYNC_TIMEOUT)); return;
   }
   if (syncPhase == SYNC_SCANNING) {
     int count = WiFi.scanComplete();
     if (count == WIFI_SCAN_RUNNING) return;
-    if (count < 0) { syncFinish(false, "Falha na busca"); return; }
+    if (count < 0) { syncFinish(false, tr(TXT_SYNC_SCAN_FAILED)); return; }
     for (int i = 0; i < count && syncNetworkCount < 6; i++) {
       String ssid = WiFi.SSID(i);
       if (!ssid.startsWith("PassVault-Sync-") || ssid.length() != 21 ||
@@ -197,7 +197,7 @@ void syncTick() {
       if (!duplicate) strlcpy(syncNetworks[syncNetworkCount++], ssid.c_str(), 33);
     }
     WiFi.scanDelete();
-    if (!syncNetworkCount) { syncFinish(false, "Nenhum PassVault"); return; }
+    if (!syncNetworkCount) { syncFinish(false, tr(TXT_SYNC_NONE_FOUND)); return; }
     syncNetworkIndex = 0;
     strlcpy(syncSsid, syncNetworks[0], sizeof(syncSsid));
     syncPhase = SYNC_SELECT;
@@ -214,13 +214,13 @@ void syncTick() {
       if (n > 0) { syncOffset += n; syncProgress = millis(); }
     }
     if (!syncClient.connected() || millis() - syncProgress >= (syncOffset == sizeof(syncChallenge) ? 60000UL : SYNC_IO_MS))
-      syncFinish(false, "Destino sem resposta");
+      syncFinish(false, tr(TXT_SYNC_DESTINATION_SILENT));
   } else if (syncPhase == SYNC_CONNECTING) {
-    if (millis() - syncProgress >= SYNC_IO_MS) { syncFinish(false, "Falha: confira codigo"); return; }
+    if (millis() - syncProgress >= SYNC_IO_MS) { syncFinish(false, tr(TXT_SYNC_CHECK_CODE)); return; }
     if (WiFi.status() != WL_CONNECTED) return;
     if (!syncClient.connect(WiFi.gatewayIP(), SYNC_PORT, 1000) ||
         syncClient.write(syncChallenge, sizeof(syncChallenge)) != sizeof(syncChallenge)) {
-      syncFinish(false, "Falha na conexao"); return;
+      syncFinish(false, tr(TXT_SYNC_CONNECTION_FAILED)); return;
     }
     syncProgress = millis();
     syncPhase = SYNC_RECEIVING;
@@ -232,28 +232,28 @@ void syncTick() {
     }
     if (syncOffset == SYNC_PACKET_SIZE) {
       if (memcmp(syncPacket, SYNC_MAGIC, 8) || !syncCrypt(false)) {
-        syncFinish(false, "Autenticacao falhou"); return;
+        syncFinish(false, tr(TXT_SYNC_AUTH_FAILED)); return;
       }
       int r = syncMerge(syncPacket + SYNC_HEADER_SIZE, SYNC_DATA_SIZE, syncAdded, syncSkipped);
       syncAck[0] = r == 0 ? 0 : r == -2 ? 2 : r == -3 ? 3 : 1;
       syncAck[1] = syncAdded; syncAck[2] = syncSkipped;
       if (!syncReceipt(false) || syncClient.write(syncAck, sizeof(syncAck)) != sizeof(syncAck)) {
-        syncFinish(false, r == 0 ? "Salvo; resposta falhou" : "Falha; resposta perdida"); return;
+        syncFinish(false, r == 0 ? tr(TXT_SYNC_SAVED_REPLY_FAILED) : tr(TXT_SYNC_FAILED_REPLY_LOST)); return;
       }
       // Leave the radio alive so the receipt can reach the source before shutdown.
-      syncMessage = r == 0 ? "Recebido" : r == -2 ? "Sem espaco: nada salvo" :
-          r == -3 ? "Falha ao salvar" : "Dados invalidos";
+      syncMessage = r == 0 ? tr(TXT_SYNC_RECEIVED) : r == -2 ? tr(TXT_SYNC_NO_SPACE) :
+          r == -3 ? tr(TXT_SAVE_FAILED) : tr(TXT_SYNC_INVALID_DATA);
       syncWipePacket();
       syncProgress = millis();
       syncPhase = SYNC_REPLY_DRAIN;
     } else if ((!syncClient.connected() && !syncClient.available()) || millis() - syncProgress >= 60000)
-      syncFinish(false, "Transferencia incompleta");
+      syncFinish(false, tr(TXT_SYNC_INCOMPLETE));
   } else if (syncPhase == SYNC_REPLY_DRAIN) {
     if (millis() - syncProgress >= 500) syncFinish(syncAck[0] == 0, syncMessage);
   } else if (syncPhase == SYNC_SENDING) {
     size_t n = min(SYNC_PACKET_SIZE - syncOffset, size_t(256));
     if (!syncClient.connected() || syncClient.write(syncPacket + syncOffset, n) != n) {
-      syncFinish(false, "Falha no envio"); return;
+      syncFinish(false, tr(TXT_SYNC_SEND_FAILED)); return;
     }
     syncOffset += n;
     syncProgress = millis();
@@ -268,13 +268,13 @@ void syncTick() {
     }
     if (syncOffset == sizeof(syncAck)) {
       if (!syncReceipt(true) || syncAck[0] > 3 || syncAck[1] > MAX_CREDS || syncAck[2] > MAX_CREDS) {
-        syncFinish(false, "Resposta invalida"); return;
+        syncFinish(false, tr(TXT_SYNC_INVALID_REPLY)); return;
       }
       syncAdded = syncAck[1]; syncSkipped = syncAck[2];
-      syncFinish(syncAck[0] == 0, syncAck[0] == 0 ? "Destino confirmou" :
-          syncAck[0] == 2 ? "Destino sem espaco" : "Falha no destino");
+      syncFinish(syncAck[0] == 0, syncAck[0] == 0 ? tr(TXT_SYNC_DESTINATION_CONFIRMED) :
+          syncAck[0] == 2 ? tr(TXT_SYNC_DESTINATION_FULL) : tr(TXT_SYNC_DESTINATION_FAILED));
     } else if ((!syncClient.connected() && !syncClient.available()) || millis() - syncProgress >= SYNC_IO_MS) {
-      syncFinish(false, "Sem confirmacao: confira");
+      syncFinish(false, tr(TXT_SYNC_UNCONFIRMED));
     }
   }
 }

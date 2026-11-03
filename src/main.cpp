@@ -764,7 +764,7 @@ void drawSettings() {
   tft.setTextDatum(TC_DATUM);
   tft.drawString(tr(TXT_TAP_CHANGE), SCR_W / 2, SETTINGS_LOCK_Y + SETTINGS_H + 6, 2);
   btn(SETTINGS_X, SETTINGS_WIFI_Y, SETTINGS_PAIR_W, SETTINGS_H, "WiFi", C_BTN);
-  btn(SETTINGS_LANGUAGE_X, SETTINGS_WIFI_Y, SETTINGS_PAIR_W, SETTINGS_H, "Sincronizar", C_ACCENT);
+  btn(SETTINGS_LANGUAGE_X, SETTINGS_WIFI_Y, SETTINGS_PAIR_W, SETTINGS_H, tr(TXT_SYNC), C_ACCENT);
   btn(SETTINGS_X, SETTINGS_THEME_Y, SETTINGS_W, SETTINGS_H, tr(TXT_THEMES), C_ACCENT);
   btn(SETTINGS_X, SETTINGS_PIN_Y, SETTINGS_W, SETTINGS_H, tr(TXT_CHANGE_PIN), C_BTN);
   btn(SETTINGS_X, SETTINGS_BRIGHT_Y, SETTINGS_EXTRA_W, SETTINGS_H, tr(TXT_BRIGHTNESS), C_ACCENT);
@@ -994,64 +994,64 @@ void drawSync() {
   beginScreen();
   focusBegin(ST_SYNC * 32 + syncPhase);
   tft.fillScreen(C_BG);
-  syncLine("Sincronizar", 8, C_ACCENT);
+  syncLine(tr(TXT_SYNC), 8, C_ACCENT);
   if (syncPhase == SYNC_CODE) {
-    syncLine("Codigo da origem (12)", 30);
+    syncLine(tr(TXT_SYNC_CODE), 30);
     syncLine(syncCode, 52, C_ACCENT);
     int w = (SCR_W - 28) / 3;
     for (int i = 0; i < 12; i++)
       btn(10 + (i % 3) * (w + 4), SYNC_KEY_Y + (i / 3) * SYNC_KEY_H,
           w, SYNC_KEY_H - 3, npLabels[i], C_BTN);
-    btn(10, SYNC_BACK_Y, (SCR_W - 24) / 2, 26, "Cancelar", C_BTN);
+    btn(10, SYNC_BACK_Y, (SCR_W - 24) / 2, 26, tr(TXT_CANCEL), C_BTN);
     btn(14 + (SCR_W - 24) / 2, SYNC_BACK_Y, (SCR_W - 24) / 2, 26,
-        "Receber", strlen(syncCode) == 12 ? C_ACCENT : C_DIM);
+        tr(TXT_SYNC_RECEIVE), strlen(syncCode) == 12 ? C_ACCENT : C_DIM);
     focusEnd();
     return;
   }
   switch (syncPhase) {
     case SYNC_CHOOSE:
-      syncLine("Adiciona contas novas", 38);
-      syncLine("Preserva as existentes", 60);
-      btn(10, SYNC_ACTION_Y, SCR_W - 20, 28, "Enviar", C_ACCENT);
-      btn(10, SYNC_SECOND_Y, SCR_W - 20, 28, "Receber", C_BTN);
+      syncLine(tr(TXT_SYNC_ADD_NEW), 38);
+      syncLine(tr(TXT_SYNC_KEEP_EXISTING), 60);
+      btn(10, SYNC_ACTION_Y, SCR_W - 20, 28, tr(TXT_SYNC_SEND), C_ACCENT);
+      btn(10, SYNC_SECOND_Y, SCR_W - 20, 28, tr(TXT_SYNC_RECEIVE), C_BTN);
       break;
     case SYNC_SELECT:
-      syncLine("Escolha a origem", 38);
+      syncLine(tr(TXT_SYNC_CHOOSE_SOURCE), 38);
       syncLine(syncSsid, 64, C_ACCENT);
-      btn(10, SYNC_ACTION_Y, SCR_W - 20, 28, "Usar este aparelho", C_ACCENT);
-      btn(10, SYNC_SECOND_Y, SCR_W - 20, 28, "Proximo", C_BTN);
+      btn(10, SYNC_ACTION_Y, SCR_W - 20, 28, tr(TXT_SYNC_USE_DEVICE), C_ACCENT);
+      btn(10, SYNC_SECOND_Y, SCR_W - 20, 28, tr(TXT_SYNC_NEXT), C_BTN);
       break;
     case SYNC_AP_WAIT:
     case SYNC_WAIT_CONFIRM:
       syncLine(syncSsid, 36);
       syncLine(syncCode, 60, C_ACCENT);
-      syncLine("Digite no destino", 84);
+      syncLine(tr(TXT_SYNC_ENTER_DESTINATION), 84);
       if (syncPhase == SYNC_WAIT_CONFIRM && syncOffset == sizeof(syncChallenge)) {
-        syncLine("Destino conectado", 106);
-        btn(10, SYNC_ACTION_Y, SCR_W - 20, 28, "Confirmar envio", C_ACCENT);
-      } else syncLine("Aguardando destino...", 106);
+        syncLine(tr(TXT_SYNC_DESTINATION_CONNECTED), 106);
+        btn(10, SYNC_ACTION_Y, SCR_W - 20, 28, tr(TXT_SYNC_CONFIRM_SEND), C_ACCENT);
+      } else syncLine(tr(TXT_SYNC_WAIT_DESTINATION), 106);
       break;
-    case SYNC_SCANNING: syncLine("Buscando PassVaults...", 60); break;
-    case SYNC_CONNECTING: syncLine("Conectando...", 60); break;
+    case SYNC_SCANNING: syncLine(tr(TXT_SYNC_SCANNING), 60); break;
+    case SYNC_CONNECTING: syncLine(tr(TXT_SYNC_CONNECTING), 60); break;
     case SYNC_RECEIVING:
-      syncLine("Aguardando envio...", 60);
-      syncLine("Confirme na origem", 86);
+      syncLine(tr(TXT_SYNC_WAIT_SEND), 60);
+      syncLine(tr(TXT_SYNC_CONFIRM_SOURCE), 86);
       break;
-    case SYNC_SENDING: syncLine("Enviando...", 60); break;
-    case SYNC_ACK: syncLine("Confirmando destino...", 60); break;
-    case SYNC_REPLY_DRAIN: syncLine("Confirmando origem...", 60); break;
+    case SYNC_SENDING: syncLine(tr(TXT_SYNC_SENDING), 60); break;
+    case SYNC_ACK: syncLine(tr(TXT_SYNC_ACK_DESTINATION), 60); break;
+    case SYNC_REPLY_DRAIN: syncLine(tr(TXT_SYNC_ACK_SOURCE), 60); break;
     case SYNC_FINISHED:
     case SYNC_FAILED: {
       syncLine(syncMessage, 42, syncPhase == SYNC_FAILED ? C_WARN : C_ACCENT);
       char result[64];
-      snprintf(result, sizeof(result), "Adicionadas: %d", syncAdded); syncLine(result, 70);
-      snprintf(result, sizeof(result), "Ignoradas: %d", syncSkipped); syncLine(result, 92);
-      btn(10, SYNC_SECOND_Y, SCR_W - 20, 28, "Nova sessao", C_ACCENT);
+      snprintf(result, sizeof(result), tr(TXT_SYNC_ADDED), syncAdded); syncLine(result, 70);
+      snprintf(result, sizeof(result), tr(TXT_SYNC_SKIPPED), syncSkipped); syncLine(result, 92);
+      btn(10, SYNC_SECOND_Y, SCR_W - 20, 28, tr(TXT_SYNC_NEW_SESSION), C_ACCENT);
       break;
     }
     default: break;
   }
-  btn(10, SYNC_BACK_Y, SCR_W - 20, 26, "Voltar", C_BTN);
+  btn(10, SYNC_BACK_Y, SCR_W - 20, 26, tr(TXT_BACK), C_BTN);
   focusEnd();
 }
 

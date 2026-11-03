@@ -184,13 +184,21 @@ int main() {
   strcpy(syncCode,"123456789012");syncConnect();assert(syncPhase==SYNC_CONNECTING);
   now+=SYNC_IO_MS;syncTick();assert(syncPhase==SYNC_FAILED);assertOff();
   syncStartSender();syncStop();assert(syncPhase==SYNC_OFF);assertOff();
-  WiFi.apOk=false;syncStartSender();assert(syncPhase==SYNC_FAILED);assertOff();
+  WiFi.apOk=false;
+  for(int language=0;language<LANGUAGE_COUNT;language++) {
+    activeLanguage=language;
+    syncStartSender();assert(syncPhase==SYNC_FAILED);assertOff();
+    assert(strcmp(syncMessage,tr(TXT_SYNC_AP_FAILED))==0);
+    WiFi.apOk=true;syncStartSender();now+=SYNC_SESSION_MS;syncTick();
+    assert(syncPhase==SYNC_FAILED && strcmp(syncMessage,tr(TXT_SYNC_TIMEOUT))==0);
+    WiFi.apOk=false;
+  }
   std::cout << "Sync lifecycle, confirmation, framing, auth failures, replay challenge, truncation and cleanup passed\n";
 }
 '''
 with tempfile.TemporaryDirectory() as tmp:
     src = Path(tmp) / 'transport.cpp'
-    src.write_text(support + struct + '\nCredential creds[MAX_CREDS]; int credCount=0;\n' + data + fakes + transport + checks)
+    src.write_text(support + '\n#include "localization.h"\n' + struct + '\nCredential creds[MAX_CREDS]; int credCount=0;\n' + data + fakes + transport + checks)
     exe = Path(tmp) / 'transport'
-    subprocess.run(['c++', '-std=c++17', str(src), '-o', str(exe)], check=True)
+    subprocess.run(['c++', '-std=c++17', '-I', str(root / 'include'), str(src), '-o', str(exe)], check=True)
     subprocess.run([str(exe)], check=True)

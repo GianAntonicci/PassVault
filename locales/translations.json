@@ -1073,6 +1073,466 @@
       "無効なファイル",
       "Ungültige Datei",
       "Неверный файл"
+    ],
+    "sync": [
+      "Sincronizar",
+      "Sync",
+      "Sincronizar",
+      "同步",
+      "Sincronizza",
+      "同期",
+      "Abgleichen",
+      "Синхронизация"
+    ],
+    "sync_code": [
+      "Código da origem (12)",
+      "Source code (12)",
+      "Código de origen (12)",
+      "源设备代码 (12)",
+      "Codice origine (12)",
+      "送信元コード (12)",
+      "Quellcode (12)",
+      "Код источника (12)"
+    ],
+    "sync_receive": [
+      "Receber",
+      "Receive",
+      "Recibir",
+      "接收",
+      "Ricevi",
+      "受信",
+      "Empfangen",
+      "Получить"
+    ],
+    "sync_send": [
+      "Enviar",
+      "Send",
+      "Enviar",
+      "发送",
+      "Invia",
+      "送信",
+      "Senden",
+      "Отправить"
+    ],
+    "sync_add_new": [
+      "Adiciona contas novas",
+      "Adds new accounts",
+      "Añade cuentas nuevas",
+      "添加新账户",
+      "Aggiunge nuovi account",
+      "新しいアカウントを追加",
+      "Fügt neue Konten hinzu",
+      "Добавляет новые записи"
+    ],
+    "sync_keep_existing": [
+      "Preserva as existentes",
+      "Keeps existing accounts",
+      "Conserva las existentes",
+      "保留现有账户",
+      "Mantiene gli esistenti",
+      "既存のアカウントを保持",
+      "Behält vorhandene Konten",
+      "Сохраняет существующие"
+    ],
+    "sync_choose_source": [
+      "Escolha a origem",
+      "Choose source",
+      "Elige el origen",
+      "选择源设备",
+      "Scegli origine",
+      "送信元を選択",
+      "Quelle wählen",
+      "Выберите источник"
+    ],
+    "sync_use_device": [
+      "Usar este aparelho",
+      "Use this device",
+      "Usar este dispositivo",
+      "使用此设备",
+      "Usa questo dispositivo",
+      "この端末を使用",
+      "Dieses Gerät nutzen",
+      "Выбрать устройство"
+    ],
+    "sync_next": [
+      "Próximo",
+      "Next",
+      "Siguiente",
+      "下一个",
+      "Avanti",
+      "次へ",
+      "Weiter",
+      "Далее"
+    ],
+    "sync_enter_destination": [
+      "Digite no destino",
+      "Enter on destination",
+      "Introduce en destino",
+      "在目标设备输入",
+      "Inserisci a destinazione",
+      "受信先に入力",
+      "Am Ziel eingeben",
+      "Введите на приёмнике"
+    ],
+    "sync_destination_connected": [
+      "Destino conectado",
+      "Destination connected",
+      "Destino conectado",
+      "目标设备已连接",
+      "Destinazione connessa",
+      "受信先が接続済み",
+      "Ziel verbunden",
+      "Приёмник подключён"
+    ],
+    "sync_confirm_send": [
+      "Confirmar envio",
+      "Confirm send",
+      "Confirmar envío",
+      "确认发送",
+      "Conferma invio",
+      "送信を確認",
+      "Senden bestätigen",
+      "Подтвердить отправку"
+    ],
+    "sync_wait_destination": [
+      "Aguardando destino...",
+      "Waiting for destination...",
+      "Esperando destino...",
+      "等待目标设备...",
+      "Attesa destinazione...",
+      "受信先を待機中...",
+      "Warte auf Ziel...",
+      "Ожидание приёмника..."
+    ],
+    "sync_scanning": [
+      "Buscando PassVaults...",
+      "Finding PassVaults...",
+      "Buscando PassVaults...",
+      "搜索 PassVault...",
+      "Ricerca PassVault...",
+      "PassVault を検索中...",
+      "Suche PassVaults...",
+      "Поиск PassVault..."
+    ],
+    "sync_connecting": [
+      "Conectando...",
+      "Connecting...",
+      "Conectando...",
+      "正在连接...",
+      "Connessione...",
+      "接続中...",
+      "Verbinden...",
+      "Подключение..."
+    ],
+    "sync_wait_send": [
+      "Aguardando envio...",
+      "Waiting for transfer...",
+      "Esperando envío...",
+      "等待传输...",
+      "Attesa invio...",
+      "送信を待機中...",
+      "Warte auf Übertragung...",
+      "Ожидание передачи..."
+    ],
+    "sync_confirm_source": [
+      "Confirme na origem",
+      "Confirm on source",
+      "Confirma en origen",
+      "在源设备确认",
+      "Conferma all’origine",
+      "送信元で確認",
+      "An Quelle bestätigen",
+      "Подтвердите на источнике"
+    ],
+    "sync_sending": [
+      "Enviando...",
+      "Sending...",
+      "Enviando...",
+      "正在发送...",
+      "Invio...",
+      "送信中...",
+      "Senden...",
+      "Отправка..."
+    ],
+    "sync_ack_destination": [
+      "Confirmando destino...",
+      "Confirming destination...",
+      "Confirmando destino...",
+      "确认目标设备...",
+      "Conferma destinazione...",
+      "受信先を確認中...",
+      "Bestätige Ziel...",
+      "Подтверждение приёмника..."
+    ],
+    "sync_ack_source": [
+      "Confirmando origem...",
+      "Confirming source...",
+      "Confirmando origen...",
+      "确认源设备...",
+      "Conferma origine...",
+      "送信元を確認中...",
+      "Bestätige Quelle...",
+      "Подтверждение источника..."
+    ],
+    "sync_added": [
+      "Adicionadas: %d",
+      "Added: %d",
+      "Añadidas: %d",
+      "已添加: %d",
+      "Aggiunte: %d",
+      "追加: %d",
+      "Hinzugefügt: %d",
+      "Добавлено: %d"
+    ],
+    "sync_skipped": [
+      "Ignoradas: %d",
+      "Skipped: %d",
+      "Omitidas: %d",
+      "已跳过: %d",
+      "Ignorate: %d",
+      "スキップ: %d",
+      "Übersprungen: %d",
+      "Пропущено: %d"
+    ],
+    "sync_new_session": [
+      "Nova sessão",
+      "New session",
+      "Nueva sesión",
+      "新会话",
+      "Nuova sessione",
+      "新しいセッション",
+      "Neue Sitzung",
+      "Новый сеанс"
+    ],
+    "sync_no_memory": [
+      "Memória insuficiente",
+      "Not enough memory",
+      "Memoria insuficiente",
+      "内存不足",
+      "Memoria insufficiente",
+      "メモリ不足",
+      "Nicht genug Speicher",
+      "Недостаточно памяти"
+    ],
+    "sync_ap_failed": [
+      "Falha ao criar AP",
+      "Failed to start AP",
+      "Error al crear AP",
+      "无法创建热点",
+      "Errore avvio AP",
+      "AP開始失敗",
+      "AP-Start fehlgeschlagen",
+      "Ошибка запуска AP"
+    ],
+    "sync_scan_failed": [
+      "Falha na busca",
+      "Scan failed",
+      "Error de búsqueda",
+      "搜索失败",
+      "Ricerca fallita",
+      "検索失敗",
+      "Suche fehlgeschlagen",
+      "Ошибка поиска"
+    ],
+    "sync_destination_lost": [
+      "Destino desconectado",
+      "Destination disconnected",
+      "Destino desconectado",
+      "目标设备已断开",
+      "Destinazione disconnessa",
+      "受信先が切断",
+      "Ziel getrennt",
+      "Приёмник отключён"
+    ],
+    "sync_encrypt_failed": [
+      "Falha ao cifrar dados",
+      "Encryption failed",
+      "Error al cifrar datos",
+      "加密失败",
+      "Cifratura fallita",
+      "暗号化失敗",
+      "Verschlüsselung fehlgeschlagen",
+      "Ошибка шифрования"
+    ],
+    "sync_timeout": [
+      "Tempo esgotado",
+      "Timed out",
+      "Tiempo agotado",
+      "已超时",
+      "Tempo scaduto",
+      "時間切れ",
+      "Zeit abgelaufen",
+      "Время истекло"
+    ],
+    "sync_none_found": [
+      "Nenhum PassVault",
+      "No PassVault found",
+      "Ningún PassVault",
+      "未找到 PassVault",
+      "Nessun PassVault",
+      "PassVault なし",
+      "Kein PassVault gefunden",
+      "PassVault не найден"
+    ],
+    "sync_destination_silent": [
+      "Destino sem resposta",
+      "Destination not responding",
+      "Destino sin respuesta",
+      "目标设备无响应",
+      "Destinazione non risponde",
+      "受信先の応答なし",
+      "Ziel antwortet nicht",
+      "Приёмник не отвечает"
+    ],
+    "sync_check_code": [
+      "Falha: confira código",
+      "Failed: check code",
+      "Error: revisa código",
+      "失败: 请检查代码",
+      "Errore: verifica codice",
+      "失敗: コードを確認",
+      "Fehler: Code prüfen",
+      "Ошибка: проверьте код"
+    ],
+    "sync_connection_failed": [
+      "Falha na conexão",
+      "Connection failed",
+      "Error de conexión",
+      "连接失败",
+      "Connessione fallita",
+      "接続失敗",
+      "Verbindung fehlgeschlagen",
+      "Ошибка подключения"
+    ],
+    "sync_auth_failed": [
+      "Autenticação falhou",
+      "Authentication failed",
+      "Autenticación fallida",
+      "认证失败",
+      "Autenticazione fallita",
+      "認証失敗",
+      "Anmeldung fehlgeschlagen",
+      "Ошибка аутентификации"
+    ],
+    "sync_saved_reply_failed": [
+      "Salvo; resposta falhou",
+      "Saved; reply failed",
+      "Guardado; falló respuesta",
+      "已保存; 回复失败",
+      "Salvato; risposta fallita",
+      "保存済み; 応答失敗",
+      "Gespeichert; Antwort fehlte",
+      "Сохранено; ответ не дошёл"
+    ],
+    "sync_failed_reply_lost": [
+      "Falha; resposta perdida",
+      "Failed; reply lost",
+      "Error; respuesta perdida",
+      "失败; 回复丢失",
+      "Errore; risposta persa",
+      "失敗; 応答なし",
+      "Fehler; Antwort verloren",
+      "Ошибка; ответ потерян"
+    ],
+    "sync_received": [
+      "Recebido",
+      "Received",
+      "Recibido",
+      "已接收",
+      "Ricevuto",
+      "受信完了",
+      "Empfangen",
+      "Получено"
+    ],
+    "sync_no_space": [
+      "Sem espaço: nada salvo",
+      "Full: nothing saved",
+      "Sin espacio: sin guardar",
+      "空间不足: 未保存",
+      "Pieno: nulla salvato",
+      "容量不足: 保存なし",
+      "Voll: nichts gespeichert",
+      "Нет места: не сохранено"
+    ],
+    "sync_invalid_data": [
+      "Dados inválidos",
+      "Invalid data",
+      "Datos no válidos",
+      "数据无效",
+      "Dati non validi",
+      "無効なデータ",
+      "Ungültige Daten",
+      "Неверные данные"
+    ],
+    "sync_incomplete": [
+      "Transferência incompleta",
+      "Transfer incomplete",
+      "Transferencia incompleta",
+      "传输未完成",
+      "Trasferimento incompleto",
+      "転送未完了",
+      "Übertragung unvollständig",
+      "Передача не завершена"
+    ],
+    "sync_send_failed": [
+      "Falha no envio",
+      "Send failed",
+      "Error de envío",
+      "发送失败",
+      "Invio fallito",
+      "送信失敗",
+      "Senden fehlgeschlagen",
+      "Ошибка отправки"
+    ],
+    "sync_invalid_reply": [
+      "Resposta inválida",
+      "Invalid reply",
+      "Respuesta no válida",
+      "回复无效",
+      "Risposta non valida",
+      "無効な応答",
+      "Ungültige Antwort",
+      "Неверный ответ"
+    ],
+    "sync_destination_confirmed": [
+      "Destino confirmou",
+      "Destination confirmed",
+      "Destino confirmó",
+      "目标设备已确认",
+      "Destinazione confermata",
+      "受信先が確認済み",
+      "Ziel hat bestätigt",
+      "Приёмник подтвердил"
+    ],
+    "sync_destination_full": [
+      "Destino sem espaço",
+      "Destination full",
+      "Destino sin espacio",
+      "目标设备空间不足",
+      "Destinazione piena",
+      "受信先の容量不足",
+      "Zielspeicher voll",
+      "Приёмник заполнен"
+    ],
+    "sync_destination_failed": [
+      "Falha no destino",
+      "Destination failed",
+      "Error en destino",
+      "目标设备失败",
+      "Errore a destinazione",
+      "受信先で失敗",
+      "Fehler am Ziel",
+      "Ошибка на приёмнике"
+    ],
+    "sync_unconfirmed": [
+      "Sem confirmação: confira",
+      "Unconfirmed: check device",
+      "Sin confirmar: revisa",
+      "未确认: 请检查设备",
+      "Non confermato: verifica",
+      "未確認: 端末を確認",
+      "Unbestätigt: Gerät prüfen",
+      "Нет подтверждения: проверьте"
     ]
   }
 }
