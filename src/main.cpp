@@ -17,11 +17,12 @@ VaultDisplay tft;
 #include "keyboard.h"
 #include "vault_core.h"
 #include "vault_web.h"
+#include "vault_sync.h"
 #include "screen_fade.h"
 
 // ---- State machine ----
 enum State { ST_PIN_SETUP, ST_PIN_CONFIRM, ST_PIN_ENTRY, ST_MENU, ST_DETAIL, ST_WEB, ST_SEARCH, ST_SETTINGS, ST_THEMES, ST_BRIGHTNESS, ST_SORT,
-             ST_PIN_CURRENT, ST_PIN_NEW, ST_PIN_NEW_CONFIRM, ST_LANGUAGES };
+             ST_PIN_CURRENT, ST_PIN_NEW, ST_PIN_NEW_CONFIRM, ST_LANGUAGES, ST_SYNC };
 State state = ST_PIN_ENTRY;
 ScreenFade screenFade;
 
@@ -70,6 +71,8 @@ void drawDetail();
 void drawWebScreen();
 void drawSearch();
 void drawSettings();
+void drawSync();
+void handleBack();
 void drawPinScreen(const char* title);
 void lockDevice();
 void clearPinBuffers();
@@ -760,7 +763,8 @@ void drawSettings() {
   tft.setTextColor(C_DIM);
   tft.setTextDatum(TC_DATUM);
   tft.drawString(tr(TXT_TAP_CHANGE), SCR_W / 2, SETTINGS_LOCK_Y + SETTINGS_H + 6, 2);
-  btn(SETTINGS_X, SETTINGS_WIFI_Y, SETTINGS_W, SETTINGS_H, tr(TXT_WIFI_ON), C_BTN);
+  btn(SETTINGS_X, SETTINGS_WIFI_Y, SETTINGS_PAIR_W, SETTINGS_H, "WiFi", C_BTN);
+  btn(SETTINGS_LANGUAGE_X, SETTINGS_WIFI_Y, SETTINGS_PAIR_W, SETTINGS_H, "Sincronizar", C_ACCENT);
   btn(SETTINGS_X, SETTINGS_THEME_Y, SETTINGS_W, SETTINGS_H, tr(TXT_THEMES), C_ACCENT);
   btn(SETTINGS_X, SETTINGS_PIN_Y, SETTINGS_W, SETTINGS_H, tr(TXT_CHANGE_PIN), C_BTN);
   btn(SETTINGS_X, SETTINGS_BRIGHT_Y, SETTINGS_EXTRA_W, SETTINGS_H, tr(TXT_BRIGHTNESS), C_ACCENT);
@@ -939,7 +943,13 @@ void handleSettingsTouch(int tx, int ty) {
       tft.setTextDatum(TC_DATUM);
       tft.drawString(tr(TXT_SAVE_FAILED), SCR_W / 2, SETTINGS_LOCK_Y + SETTINGS_H + 6, 2);
     }
-  } else if (inBox(tx, ty, SETTINGS_X, SETTINGS_WIFI_Y, SETTINGS_W, SETTINGS_H)) {
+  } else if (inBox(tx, ty, SETTINGS_LANGUAGE_X, SETTINGS_WIFI_Y, SETTINGS_PAIR_W, SETTINGS_H)) {
+    syncStop();
+    syncAdded = syncSkipped = 0;
+    syncPhase = SYNC_CHOOSE;
+    state = ST_SYNC;
+    drawSync();
+  } else if (inBox(tx, ty, SETTINGS_X, SETTINGS_WIFI_Y, SETTINGS_PAIR_W, SETTINGS_H)) {
     startWeb();
     state = ST_WEB;
     drawWebScreen();
@@ -965,6 +975,119 @@ void handleSettingsTouch(int tx, int ty) {
     state = ST_MENU;
     drawMenu();
   }
+}
+
+// ---- Device-to-device sync (all controls also participate in button focus) ----
+#define SYNC_ACTION_Y (SCR_H - 100)
+#define SYNC_SECOND_Y (SCR_H - 66)
+#define SYNC_BACK_Y (SCR_H - 32)
+#define SYNC_KEY_Y 78
+#define SYNC_KEY_H (min(36, (SCR_H - 118) / 4))
+
+void syncLine(const char* text, int y, uint16_t color = C_TEXT) {
+  tft.setTextColor(color, C_BG);
+  tft.setTextDatum(TC_DATUM);
+  tft.drawFitString(text, SCR_W / 2, y, 2, SCR_W - 16);
+}
+
+void drawSync() {
+  beginScreen();
+  focusBegin(ST_SYNC * 32 + syncPhase);
+  tft.fillScreen(C_BG);
+  syncLine("Sincronizar", 8, C_ACCENT);
+  if (syncPhase == SYNC_CODE) {
+    syncLine("Codigo da origem (12)", 30);
+    syncLine(syncCode, 52, C_ACCENT);
+    int w = (SCR_W - 28) / 3;
+    for (int i = 0; i < 12; i++)
+      btn(10 + (i % 3) * (w + 4), SYNC_KEY_Y + (i / 3) * SYNC_KEY_H,
+          w, SYNC_KEY_H - 3, npLabels[i], C_BTN);
+    btn(10, SYNC_BACK_Y, (SCR_W - 24) / 2, 26, "Cancelar", C_BTN);
+    btn(14 + (SCR_W - 24) / 2, SYNC_BACK_Y, (SCR_W - 24) / 2, 26,
+        "Receber", strlen(syncCode) == 12 ? C_ACCENT : C_DIM);
+    focusEnd();
+    return;
+  }
+  switch (syncPhase) {
+    case SYNC_CHOOSE:
+      syncLine("Adiciona contas novas", 38);
+      syncLine("Preserva as existentes", 60);
+      btn(10, SYNC_ACTION_Y, SCR_W - 20, 28, "Enviar", C_ACCENT);
+      btn(10, SYNC_SECOND_Y, SCR_W - 20, 28, "Receber", C_BTN);
+      break;
+    case SYNC_SELECT:
+      syncLine("Escolha a origem", 38);
+      syncLine(syncSsid, 64, C_ACCENT);
+      btn(10, SYNC_ACTION_Y, SCR_W - 20, 28, "Usar este aparelho", C_ACCENT);
+      btn(10, SYNC_SECOND_Y, SCR_W - 20, 28, "Proximo", C_BTN);
+      break;
+    case SYNC_AP_WAIT:
+    case SYNC_WAIT_CONFIRM:
+      syncLine(syncSsid, 36);
+      syncLine(syncCode, 60, C_ACCENT);
+      syncLine("Digite no destino", 84);
+      if (syncPhase == SYNC_WAIT_CONFIRM && syncOffset == sizeof(syncChallenge)) {
+        syncLine("Destino conectado", 106);
+        btn(10, SYNC_ACTION_Y, SCR_W - 20, 28, "Confirmar envio", C_ACCENT);
+      } else syncLine("Aguardando destino...", 106);
+      break;
+    case SYNC_SCANNING: syncLine("Buscando PassVaults...", 60); break;
+    case SYNC_CONNECTING: syncLine("Conectando...", 60); break;
+    case SYNC_RECEIVING:
+      syncLine("Aguardando envio...", 60);
+      syncLine("Confirme na origem", 86);
+      break;
+    case SYNC_SENDING: syncLine("Enviando...", 60); break;
+    case SYNC_ACK: syncLine("Confirmando destino...", 60); break;
+    case SYNC_REPLY_DRAIN: syncLine("Confirmando origem...", 60); break;
+    case SYNC_FINISHED:
+    case SYNC_FAILED: {
+      syncLine(syncMessage, 42, syncPhase == SYNC_FAILED ? C_WARN : C_ACCENT);
+      char result[64];
+      snprintf(result, sizeof(result), "Adicionadas: %d", syncAdded); syncLine(result, 70);
+      snprintf(result, sizeof(result), "Ignoradas: %d", syncSkipped); syncLine(result, 92);
+      btn(10, SYNC_SECOND_Y, SCR_W - 20, 28, "Nova sessao", C_ACCENT);
+      break;
+    }
+    default: break;
+  }
+  btn(10, SYNC_BACK_Y, SCR_W - 20, 26, "Voltar", C_BTN);
+  focusEnd();
+}
+
+void handleSyncTouch(int tx, int ty) {
+  if (syncPhase == SYNC_CODE) {
+    int w = (SCR_W - 28) / 3;
+    for (int i = 0; i < 12; i++) {
+      if (!inBox(tx, ty, 10 + (i % 3) * (w + 4), SYNC_KEY_Y + (i / 3) * SYNC_KEY_H, w, SYNC_KEY_H - 3)) continue;
+      size_t len = strlen(syncCode);
+      if (i == 9) memset(syncCode, 0, sizeof(syncCode));
+      else if (i == 11) { if (len) syncCode[len - 1] = 0; }
+      else if (len < 12) { syncCode[len] = npLabels[i][0]; syncCode[len + 1] = 0; }
+      drawSync();
+      return;
+    }
+    if (inBox(tx, ty, 14 + (SCR_W - 24) / 2, SYNC_BACK_Y, (SCR_W - 24) / 2, 26)) {
+      syncConnect(); drawSync(); return;
+    }
+    if (inBox(tx, ty, 10, SYNC_BACK_Y, (SCR_W - 24) / 2, 26)) handleBack();
+    return;
+  }
+  if (inBox(tx, ty, 10, SYNC_BACK_Y, SCR_W - 20, 26)) { handleBack(); return; }
+  if (inBox(tx, ty, 10, SYNC_ACTION_Y, SCR_W - 20, 28)) {
+    if (syncPhase == SYNC_CHOOSE) syncStartSender();
+    else if (syncPhase == SYNC_SELECT) syncPhase = SYNC_CODE;
+    else if (syncPhase == SYNC_WAIT_CONFIRM) syncConfirmSend();
+  } else if (inBox(tx, ty, 10, SYNC_SECOND_Y, SCR_W - 20, 28)) {
+    if (syncPhase == SYNC_CHOOSE) syncStartScan();
+    else if (syncPhase == SYNC_SELECT) {
+      syncNetworkIndex = (syncNetworkIndex + 1) % syncNetworkCount;
+      strlcpy(syncSsid, syncNetworks[syncNetworkIndex], sizeof(syncSsid));
+    } else if (syncPhase == SYNC_FINISHED || syncPhase == SYNC_FAILED) {
+      syncStop(); syncAdded = syncSkipped = 0; syncPhase = SYNC_CHOOSE;
+    }
+  }
+  drawSync();
 }
 
 // ---- Web Screen ----
@@ -1032,6 +1155,11 @@ void handleBack() {
       state = ST_MENU;
       drawMenu();
       break;
+    case ST_SYNC:
+      syncStop();
+      state = ST_SETTINGS;
+      drawSettings();
+      break;
     case ST_WEB:
       closeWeb();
       break;
@@ -1047,6 +1175,8 @@ void handleBack() {
 
 // ---- Lock ----
 void lockDevice() {
+  if (state == ST_SYNC) syncStop();
+  if (webRunning) stopWeb();
   typingFeedbackVisible = false;
   detailPasswordVisible = false;
   clearMemory();
@@ -1142,6 +1272,16 @@ void loop() {
   }
 
   webTick();
+  if (state == ST_SYNC) {
+    SyncPhase previous = syncPhase;
+    bool ready = syncPhase == SYNC_WAIT_CONFIRM && syncOffset == sizeof(syncChallenge);
+    syncTick();
+    if (previous != syncPhase || ready != (syncPhase == SYNC_WAIT_CONFIRM && syncOffset == sizeof(syncChallenge))) drawSync();
+    // Pairing has an absolute two-minute limit; terminal/choice screens auto-lock.
+    if ((syncPhase == SYNC_CHOOSE || syncPhase == SYNC_FINISHED || syncPhase == SYNC_FAILED) &&
+        millis() - lastAction >= autoLockMs) { lockDevice(); return; }
+  }
+
   if (state == ST_WEB && webShownLanguage != activeLanguage) drawWebScreen();
 
   // WiFi ligado sem uso (tela e navegador): desliga o AP e bloqueia
@@ -1190,6 +1330,9 @@ void loop() {
       break;
     case ST_DETAIL:
       handleDetailTouch(tx, ty);
+      break;
+    case ST_SYNC:
+      handleSyncTouch(tx, ty);
       break;
     case ST_WEB:
       handleWebTouch(tx, ty);
