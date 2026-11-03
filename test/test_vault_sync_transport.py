@@ -139,8 +139,8 @@ int main() {
     if(variant==3) incoming[7]++;
     if(variant==4) incoming.resize(120);
     int ticks=0;
-    while(syncPhase==SYNC_RECEIVING && ticks++<500) {
-      syncTick();if(inputOffset<incoming.size())assert(credCount==0);
+    while((syncPhase==SYNC_RECEIVING || syncPhase==SYNC_REPLY_DRAIN) && ticks++<1000) {
+      now++;syncTick();if(inputOffset<incoming.size())assert(credCount==0);
       if(variant==4 && inputOffset==incoming.size()) link=false;
     }
     assert(syncPhase==(variant==0?SYNC_FINISHED:SYNC_FAILED));assertOff();
@@ -158,6 +158,19 @@ int main() {
     if(variant==0)incoming[3]^=1;
     if(variant==1)incoming[1]^=1;
     if(variant==2) { incoming.clear();now+=SYNC_IO_MS; }
+    while(syncPhase==SYNC_ACK)syncTick();
+    assert(syncPhase==SYNC_FAILED);assertOff();
+  }
+  // Reject forged or missing delivery receipts without reporting success.
+  for(int variant=0;variant<2;variant++) {
+    syncStop();clearIo();syncStarted=syncProgress=now;
+    strcpy(syncCode,code.c_str());assert(syncAllocate());
+    memcpy(syncPacket,packet.data(),packet.size());memset(syncChallenge,42,16);
+    syncClient.active=link=true;syncPhase=SYNC_ACK;
+    if(!variant) {
+      memset(syncAck,0,sizeof(syncAck));assert(syncReceipt(false));syncAck[3]^=1;
+      incoming.assign(syncAck,syncAck+sizeof(syncAck));
+    } else now+=SYNC_IO_MS;
     while(syncPhase==SYNC_ACK)syncTick();
     assert(syncPhase==SYNC_FAILED);assertOff();
   }

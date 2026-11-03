@@ -15,7 +15,7 @@ const uint8_t SYNC_MAGIC[8] = {'P','V','S','Y','N','C',0,1};
 
 enum SyncPhase { SYNC_OFF, SYNC_CHOOSE, SYNC_SCANNING, SYNC_SELECT, SYNC_CODE,
                  SYNC_AP_WAIT, SYNC_CONNECTING, SYNC_WAIT_CONFIRM,
-                 SYNC_RECEIVING, SYNC_SENDING, SYNC_ACK, SYNC_FINISHED, SYNC_FAILED };
+                 SYNC_RECEIVING, SYNC_SENDING, SYNC_REPLY_DRAIN, SYNC_ACK, SYNC_FINISHED, SYNC_FAILED };
 SyncPhase syncPhase = SYNC_OFF;
 WiFiServer syncServer(SYNC_PORT);
 WiFiClient syncClient;
@@ -171,8 +171,7 @@ void syncConfirmSend() {
   if (!syncAllocate()) return;
   memcpy(syncPacket, SYNC_MAGIC, 8);
   esp_fill_random(syncPacket + 8, 28); // salt and IV
-  syncEncode(syncPacket + SYNC_HEADER_SIZE);
-  if (!syncValidData(syncPacket + SYNC_HEADER_SIZE, SYNC_DATA_SIZE) || !syncCrypt(true)) {
+  if (!syncEncode(syncPacket + SYNC_HEADER_SIZE) || !syncValidData(syncPacket + SYNC_HEADER_SIZE, SYNC_DATA_SIZE) || !syncCrypt(true)) {
     syncFinish(false, "Falha ao cifrar dados"); return;
   }
   syncProgress = millis();
@@ -241,11 +240,16 @@ void syncTick() {
       if (!syncReceipt(false) || syncClient.write(syncAck, sizeof(syncAck)) != sizeof(syncAck)) {
         syncFinish(false, r == 0 ? "Salvo; resposta falhou" : "Falha; resposta perdida"); return;
       }
-      syncClient.flush();
-      syncFinish(r == 0, r == 0 ? "Recebido" : r == -2 ? "Sem espaco: nada salvo" :
-          r == -3 ? "Falha ao salvar" : "Dados invalidos");
+      // Leave the radio alive so the receipt can reach the source before shutdown.
+      syncMessage = r == 0 ? "Recebido" : r == -2 ? "Sem espaco: nada salvo" :
+          r == -3 ? "Falha ao salvar" : "Dados invalidos";
+      syncWipePacket();
+      syncProgress = millis();
+      syncPhase = SYNC_REPLY_DRAIN;
     } else if ((!syncClient.connected() && !syncClient.available()) || millis() - syncProgress >= 60000)
       syncFinish(false, "Transferencia incompleta");
+  } else if (syncPhase == SYNC_REPLY_DRAIN) {
+    if (millis() - syncProgress >= 500) syncFinish(syncAck[0] == 0, syncMessage);
   } else if (syncPhase == SYNC_SENDING) {
     size_t n = min(SYNC_PACKET_SIZE - syncOffset, size_t(256));
     if (!syncClient.connected() || syncClient.write(syncPacket + syncOffset, n) != n) {

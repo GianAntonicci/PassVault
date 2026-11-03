@@ -7,7 +7,8 @@
 constexpr size_t SYNC_ENTRY_SIZE = 165;
 constexpr size_t SYNC_DATA_SIZE = 1 + MAX_CREDS * SYNC_ENTRY_SIZE;
 
-void syncEncode(uint8_t* data) {
+bool syncEncode(uint8_t* data) {
+  if (credCount < 0 || credCount > MAX_CREDS) return false;
   memset(data, 0, SYNC_DATA_SIZE);
   data[0] = credCount;
   for (int i = 0; i < credCount; i++) {
@@ -18,6 +19,7 @@ void syncEncode(uint8_t* data) {
     p[163] = creds[i].favorite ? 1 : 0;
     p[164] = creds[i].category;
   }
+  return true;
 }
 
 bool syncValidField(const uint8_t* p, size_t n, bool required, bool allowPipe = false) {

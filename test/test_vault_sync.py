@@ -28,6 +28,8 @@ void record(int i, const char* name, const char* user="user", const char* pass="
 }
 int main() {
   int added,skipped;
+  credCount=-1;assert(!syncEncode(data));
+  credCount=MAX_CREDS+1;assert(!syncEncode(data));
   reset(); memset(data,0,sizeof(data)); data[0]=2;record(0,"mail");record(1,"bank");
   assert(syncMerge(data,sizeof(data),added,skipped)==0 && added==2 && skipped==0);
   assert(credCount==2 && creds[0].favorite && creds[0].category==CATEGORY_WORK);
@@ -64,6 +66,19 @@ int main() {
   assert(syncMerge(data,sizeof(data),added,skipped)==-3 && added==1 && credCount==1);
   prefs.failAt=-1;
   assert(syncMerge(data,sizeof(data),added,skipped)==0 && added==1 && skipped==1);
+  // Full vault and maximum-length fields, including a pipe in the password.
+  reset();memset(data,0,sizeof(data));data[0]=MAX_CREDS;
+  for(int i=0;i<MAX_CREDS;i++) {
+    uint8_t* p=data+1+i*SYNC_ENTRY_SIZE;
+    memset(p,'n',32);p[0]='A'+i;
+    memset(p+33,'u',64);memset(p+98,'p',64);p[98+63]='|';
+    p[163]=i%2;p[164]=i%CATEGORY_COUNT;
+  }
+  assert(syncMerge(data,sizeof(data),added,skipped)==0 && added==MAX_CREDS);
+  assert(strlen(creds[0].name)==32 && strlen(creds[0].user)==64 && strlen(creds[0].pass)==64);
+  assert(creds[0].pass[63]=='|' && creds[MAX_CREDS-1].useCount==0);
+  syncEncode(data);assert(syncValidData(data,sizeof(data)));
+  assert(syncMerge(data,sizeof(data),added,skipped)==0 && added==0 && skipped==MAX_CREDS);
   reset();memset(data,0,sizeof(data));
   assert(syncMerge(data,sizeof(data),added,skipped)==0 && added==0);
   std::cout << "Sync validation, merge, capacity, persistence and retries passed\n";
