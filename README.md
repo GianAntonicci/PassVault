@@ -12,7 +12,7 @@ It is a PlatformIO project with one firmware and a build environment for each su
 - **Attempt limit:** the wrong-PIN counter is stored in flash, so rebooting does not reset it. After 5 wrong PINs the device locks for 30 s, and the wait doubles with each further error. On the 10th wrong PIN, **the whole vault is erased**.
 - **Auto-lock:** after a configurable inactivity timeout (60 s by default), the device locks and the decrypted credentials are wiped from RAM. Choose 30 s, 60 s, 2 min, 5 min or 10 min in **Config. → Auto-lock**; the choice survives a restart.
 - **Display brightness:** open **Config. → Brilho** and use **−/+** to adjust from 10% to 100% in 10% steps (default: 100%). Changes apply immediately and are saved in NVS, including across restarts. Touch and physical-button navigation are supported.
-- **Screen transitions:** a non-blocking 180 ms fade eases in each new screen and returns to your selected brightness. Redrawing the same screen does not restart the animation. Auto-lock and Wi-Fi processing remain active; taps during the fade are discarded. SPI/parallel profiles draw directly; JD9853 and QSPI profiles use a PSRAM framebuffer.
+- **Screen transitions:** a non-blocking 180 ms fade eases in each new screen and returns to your selected brightness. Redrawing the same screen does not restart the animation. Auto-lock and Wi-Fi processing remain active; taps during the fade are discarded. Parallel profiles draw directly; SPI and QSPI profiles use a PSRAM framebuffer with Arduino_GFX transport.
 - **Languages:** device and web UI support Portuguese (default), English, Spanish, Mandarin (Simplified Chinese), Italian, Japanese, German and Russian. Change **Config. → Idioma** on the device or **Idioma / Language** at the top of the web UI. The choice is shared, takes effect immediately and survives restarts and PIN changes.
 - **Encrypted storage:** each credential is AES-256-CBC encrypted with a random IV and stored in NVS flash.
 - **Auto-typing:** each credential offers *All* (user + TAB + password), *Login* (user only), *Password* (password only) or **Entrar** (user + TAB + password + ENTER, submitting the form).
@@ -580,7 +580,7 @@ Direct-rendering display driver and pin settings for TFT_eSPI are passed as `bui
 1. **Add an environment:** in `platformio.ini`, add an `[env:my-board]` that `extends` the closest base section (`tdisplay_s3_base`). Set the TFT_eSPI driver and pin flags and add `-DBOARD_MY_BOARD=1`. Include only the libraries this board needs in `lib_deps`.
 2. **Add the board settings:** in `include/config.h`, add an `#elif defined(BOARD_MY_BOARD)` block with the screen size, rotation, the input pins, `TOUCH_DEBOUNCE`, and `KBD_USB_HID`. Only boards with native USB HID are supported.
 3. **Add input support if needed:** if the board's input hardware is new, add a branch to `include/input.h` that implements `inputBegin()` and `inputRead()`.
-4. **Add display support if needed:** add the transport/controller in `include/display.h` for a new SPI/QSPI controller. JD9853 and AMOLED profiles use `DISPLAY_GFX` and require working OPI PSRAM.
+4. **Add display support if needed:** add the transport/controller in `include/display.h` for a new SPI/QSPI controller. SPI and AMOLED profiles use `DISPLAY_GFX` and require working OPI PSRAM.
 5. **Build it** with `pio run -e my-board`.
 
 The geometry in `ui_layout.h` supports 170×320, 172×320, 240×240, 240×280, 240×284, 280×456 and 240×536. Other resolutions may need changes to the `PIN_*`, `NP_*` and `WEB_*` layout constants in `ui_layout.h`.
