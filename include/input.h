@@ -1,25 +1,6 @@
 #ifndef INPUT_H
 #define INPUT_H
 
-// =====================================================================
-//  Abstracao de input
-//
-//  inputBegin()                 — inicializa o hardware
-//  inputRead(x, y, gesture)     — true quando ha um evento novo
-//
-//  Gestos (mesmos IDs da CST816S):
-//    GESTURE_NONE        toque simples em (x, y)
-//    GESTURE_SWIPE_DOWN  rolar lista para cima
-//    GESTURE_SWIPE_UP    rolar lista para baixo
-//    GESTURE_BACK        "voltar" (botao fisico segurado)
-//  Evento com x = y = -1 nao acerta nenhum botao: serve so para
-//  contar atividade (auto-lock).
-//
-//  Foco (usado apenas na placa so com botoes; no-op nas demais):
-//    focusBegin(tela) / focusAdd(x, y, w, h, flags) / focusEnd()
-//  Cada tela registra seus alvos clicaveis na ordem de navegacao.
-// =====================================================================
-
 #include <Arduino.h>
 #include "display.h"
 #include "config.h"
@@ -31,13 +12,10 @@ extern VaultDisplay tft;
 #define GESTURE_SWIPE_UP    2
 #define GESTURE_BACK        100
 
-// Flags de foco: alvo na borda de uma lista rolavel
 #define FOCUS_SCROLL_UP     0x01
 #define FOCUS_SCROLL_DOWN   0x02
 
-// ---------------------------------------------------------------------
 #if defined(BOARD_TDISPLAY_S3_TOUCH)
-// ---- CST816S capacitivo, com gestos ----
 
 #include <CST816S.h>
 
@@ -53,9 +31,7 @@ bool inputRead(int &x, int &y, int &gesture) {
   return true;
 }
 
-// ---------------------------------------------------------------------
 #elif defined(INPUT_CST816_POLL) || defined(INPUT_FT3168_POLL) || defined(INPUT_AXS5106_POLL)
-// Capacitive controllers: decode finger state and emit tap/swipe on release.
 #include <Wire.h>
 #include "touch_gesture.h"
 
@@ -82,7 +58,6 @@ void inputBegin() {
 #endif
 #endif
 #ifdef INPUT_CST816_POLL
-  // Disable auto-sleep so finger-state polling also works after long idle times.
   Wire.beginTransmission(0x15);
   Wire.write(0xFE);
   Wire.write(0x01);
@@ -90,7 +65,7 @@ void inputBegin() {
 #elif defined(INPUT_FT3168_POLL)
   Wire.beginTransmission(0x38);
   Wire.write(0x00);
-  Wire.write(0x00); // Normal mode.
+  Wire.write(0x00);
   Wire.endTransmission();
 #endif
 }
@@ -111,7 +86,7 @@ bool inputRead(int &x, int &y, int &gesture) {
   if (Wire.endTransmission(false) != 0) return false;
   if (Wire.requestFrom(address, count) != count) return false;
 #ifdef INPUT_AXS5106_POLL
-  Wire.read(); // Gesture byte precedes the point count.
+  Wire.read();
 #endif
   uint8_t points = Wire.read() & 0x0F;
   int px = (Wire.read() & 0x0F) << 8;
@@ -121,23 +96,18 @@ bool inputRead(int &x, int &y, int &gesture) {
 #ifdef BOARD_TDISPLAY_S3_AMOLED_TOUCH
   int rawX = px;
   px = SCR_W - 1 - py;
-  py = rawX; // CST816 reports landscape coordinates on the 1.91-inch panel.
+  py = rawX;
 #endif
 #ifdef INPUT_AXS5106_POLL
-  px = SCR_W - 1 - px; // Manufacturer's portrait rotation 0 transform.
+  px = SCR_W - 1 - px;
 #endif
-  // Ignore malformed samples rather than generating a false release.
   if (points && (px < 0 || py < 0 || px >= SCR_W || py >= SCR_H)) return false;
   return touchGesture.sample(points != 0, px, py, x, y, gesture);
 }
 
-// ---------------------------------------------------------------------
 #elif defined(BOARD_TDISPLAY_S3)
-// ---- 2 botoes fisicos navegando um anel de foco ----
-//  BTN_DOWN (GPIO0):  clique = proximo alvo   | segurar = confirma (toque)
-//  BTN_UP   (GPIO14): clique = alvo anterior  | segurar = voltar
 
-#define FOCUS_MAX  48   // teclado da busca: 36 teclas + 3 acoes
+#define FOCUS_MAX  48
 
 struct FocusTarget { int16_t x, y, w, h; uint8_t flags; };
 
@@ -153,7 +123,6 @@ void focusOutline(int i, uint16_t color) {
   tft.drawRect(f.x - 1, f.y - 1, f.w + 2, f.h + 2, color);
 }
 
-// Tela nova reinicia o foco; redesenho da mesma tela mantem a posicao
 void focusBegin(int screen) {
   if (screen != focusScreen) focusIdx = 0;
   focusScreen = screen;
@@ -186,7 +155,6 @@ void inputBegin() {
   pinMode(BTN_UP, INPUT_PULLUP);
 }
 
-// Estado de um botao: 0 = nada, 1 = clique curto, 2 = segurou
 struct BtnState { uint8_t pin; bool down; bool longFired; unsigned long t0; };
 BtnState btnDown = { BTN_DOWN, false, false, 0 };
 BtnState btnUp   = { BTN_UP,   false, false, 0 };
@@ -195,12 +163,12 @@ int pollButton(BtnState &b) {
   bool pressed = digitalRead(b.pin) == LOW;
   unsigned long now = millis();
   if (pressed && !b.down) {
-    if (now - b.t0 < 30) return 0;          // debounce
+    if (now - b.t0 < 30) return 0;
     b.down = true; b.longFired = false; b.t0 = now;
     return 0;
   }
   if (pressed && b.down && !b.longFired && now - b.t0 >= BTN_LONG_MS) {
-    b.longFired = true;                     // dispara ainda segurando
+    b.longFired = true;
     return 2;
   }
   if (!pressed && b.down) {
@@ -218,7 +186,7 @@ bool inputRead(int &x, int &y, int &gesture) {
   int d = pollButton(btnDown);
   int u = pollButton(btnUp);
 
-  if (d == 2) {                             // confirma: toque virtual no alvo
+  if (d == 2) {
     if (focusCount == 0) return true;
     const FocusTarget &f = focusList[focusIdx];
     x = f.x + f.w / 2;
@@ -229,7 +197,7 @@ bool inputRead(int &x, int &y, int &gesture) {
 
   if (d == 1) {
     if (focusCount && (focusList[focusIdx].flags & FOCUS_SCROLL_DOWN))
-      gesture = GESTURE_SWIPE_UP;           // tela rola e o foco fica no lugar
+      gesture = GESTURE_SWIPE_UP;
     else
       focusMove(+1);
     return true;
@@ -246,7 +214,6 @@ bool inputRead(int &x, int &y, int &gesture) {
 
 #endif
 
-// Placas com touch nao usam foco
 #if !defined(BOARD_TDISPLAY_S3)
 inline void focusBegin(int) {}
 inline void focusAdd(int, int, int, int, uint8_t = 0) {}

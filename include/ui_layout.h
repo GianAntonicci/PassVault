@@ -1,7 +1,6 @@
 #ifndef UI_LAYOUT_H
 #define UI_LAYOUT_H
 
-// Shared drawing and hit-test geometry for every supported portrait panel.
 #if SCR_H <= 240
 #define PIN_TITLE_Y 4
 #define PIN_MSG_Y 32

@@ -834,6 +834,26 @@
       "Helligkeit gespeichert",
       "Яркость сохранена"
     ],
+    "led_on": [
+      "LED: ligado",
+      "LED: on",
+      "LED: encendido",
+      "LED: 开启",
+      "LED: acceso",
+      "LED: 有効",
+      "LED: an",
+      "LED: вкл"
+    ],
+    "led_off": [
+      "LED: desligado",
+      "LED: off",
+      "LED: apagado",
+      "LED: 关闭",
+      "LED: spento",
+      "LED: 無効",
+      "LED: aus",
+      "LED: выкл"
+    ],
     "storage_error": [
       "Falha no armazenamento",
       "Storage failed",

@@ -3,7 +3,6 @@
 
 #include "vault_core.h"
 
-// Wire v1: explicit byte fields, no compiler padding, PIN, key or usage history.
 constexpr size_t SYNC_ENTRY_SIZE = 165;
 constexpr size_t SYNC_DATA_SIZE = 1 + MAX_CREDS * SYNC_ENTRY_SIZE;
 
@@ -25,7 +24,6 @@ bool syncEncode(uint8_t* data) {
 bool syncValidField(const uint8_t* p, size_t n, bool required, bool allowPipe = false) {
   const uint8_t* end = (const uint8_t*)memchr(p, 0, n);
   if (!end || (required && end == p)) return false;
-  // The local storage format uses | as a separator.
   for (const uint8_t* c = p; c < end; c++)
     if (*c == '|' && !allowPipe) return false;
   return true;
@@ -47,8 +45,6 @@ bool syncSameAccount(const uint8_t* a, const uint8_t* b) {
          strcmp((const char*)a + 33, (const char*)b + 33) == 0;
 }
 
-// Append only, with the count written last. Existing records are never touched.
-// On power loss the incomplete tail is invisible and overwritten on retry.
 bool syncAppend(const uint8_t* p) {
   int idx = credCount;
   if (idx >= MAX_CREDS) return false;
@@ -74,8 +70,6 @@ bool syncAppend(const uint8_t* p) {
   return true;
 }
 
-// Validate and check capacity before the first write. Retry is idempotent.
-// -1 invalid, -2 capacity, -3 storage failure (added may be nonzero).
 int syncMerge(const uint8_t* data, size_t size, int& added, int& skipped) {
   added = skipped = 0;
   if (!syncValidData(data, size)) return -1;

@@ -1,4 +1,3 @@
-"""Host checks for actual language persistence/API, Unicode drawing and paged controls."""
 from pathlib import Path
 import importlib.util
 import shutil
@@ -15,7 +14,7 @@ catalog = generator.generate(check=True)
 core = (root / 'include/vault_core.h').read_text()
 web = (root / 'include/vault_web.h').read_text()
 main = (root / 'src/main.cpp').read_text()
-setter = core[core.index('bool setLanguage('):core.index('// ---- Crypto helpers ----')]
+setter = core[core.index('bool setLanguage('):core.index('void deriveKeyV1(')]
 loader = core[core.index('void loadLanguagePreference('):core.index('bool storageBegin(')]
 api = web[web.index('void handleLanguageGet('):web.index('void handleSortGet(')]
 controls = main[main.index('constexpr int LANGUAGE_PAGE_SIZE'):main.index('void handleSettingsTouch(')]
@@ -119,13 +118,11 @@ int main(int argc,char** argv) {
   }
   prefs.disk["language"]=255;loadLanguagePreference();assert(activeLanguage==0);
   prefs.disk.erase("language");loadLanguagePreference();assert(activeLanguage==0);
-  // Invalid UTF-8 must make progress, never read beyond the terminator.
   for(const char* malformed:{"\xE4", "\xF0\x80", "\xFF", "\xC0\x80", "\xED\xA0\x80"}) {
     const char* p=malformed;
     while(*p) { const char* before=p;nextUiCodepoint(p);assert(p>before); }
   }
   assert(uiGlyph(0x10FFFF).codepoint=='?');
-  // Render an atlas with the exact firmware bitmap renderer for visual QA.
   if(argc>1) {
     tft.fillScreen(0);tft.textcolor=1;tft.textdatum=0;
     const TextId samples[]={TXT_LANGUAGE,TXT_ENTER_PIN,TXT_PASSWORD,TXT_SETTINGS};

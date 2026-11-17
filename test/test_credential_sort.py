@@ -1,7 +1,3 @@
-"""Host tests for production sorting, categories, persistence and backup formats.
-Crypto is mocked; tests exercise the production serialization and import paths.
-Run: python3 test/test_credential_sort.py
-"""
 from pathlib import Path
 import shutil
 import subprocess
@@ -9,14 +5,14 @@ import tempfile
 
 root = Path(__file__).resolve().parents[1]
 source = (root / 'include/vault_core.h').read_text()
-struct = source[source.index('enum CredentialCategory'):source.index('// ---- Globals ----')]
+struct = source[source.index('enum CredentialCategory'):source.index('Preferences prefs;')]
 settings = source[source.index('enum CredentialSort'):source.index('bool validAutoLock')]
 backup = (source[source.index('#define BACKUP_ITERS_MIN'):source.index('void deriveBackupKeys')]
-          + source[source.index('// Gera o JSON do backup'):source.index('void clearMemory()')])
+          + source[source.index('String exportBackup('):source.index('void clearMemory()')])
 web = (root / 'include/vault_web.h').read_text()
 api = (web[web.index('void handleSave() {'):web.index('void handleFavorite() {')]
        + web[web.index('void handleSortSave() {'):web.index('void handleGet() {')])
-crud = source[source.index('void saveSingleCred(int idx) {'):source.index('// ---- Backup')]
+crud = source[source.index('void saveSingleCred(int idx) {'):source.index('#define BACKUP_ITERS_MIN')]
 support = r'''
 #include <cassert>
 #include <cstdint>
@@ -78,7 +74,6 @@ bool ctEqual(const uint8_t* a, const uint8_t* b, size_t n) { return memcmp(a,b,n
 void deriveBackupKeys(const char*, const uint8_t*, int, uint8_t* key, uint8_t* ver, uint8_t* mac) {
   memset(key,1,32);memset(ver,2,32);memset(mac,3,32);
 }
-// Deterministic stand-in; tests version/entry binding, not cryptography.
 void backupMac(const uint8_t*, const String& seed, const String* entries, int n, uint8_t* out) {
   std::string input=seed;
   for(int i=0;i<n;i++) input += "," + entries[i];
@@ -101,7 +96,7 @@ int main() {
   addCredential("beta","u","p");
   addCredential("Alpha","u","p");
   addCredential("alpha","u","p");
-  order({2,3,1,0}); // Case-insensitive, stable ties.
+  order({2,3,1,0});
   assert(setCredentialSort(SORT_RECENT));order({3,2,1,0});
   updateCredential(0,"aardvark","edited","p");order({3,2,1,0});
   assert(recordCredentialUse(1));assert(recordCredentialUse(1));
@@ -118,7 +113,6 @@ int main() {
   assert(!prefs.numbers.count("u3"));
   assert(addCredential("new","u","p"));assert(creds[3].useCount==0);
   memset(creds,0,sizeof(creds));loadCredentials();order({2,0,1,3});
-  // Legacy records without usage metadata start at zero.
   prefs.remove("u0");loadCredentials();assert(creds[0].useCount==0);
   assert(!recordCredentialUse(-1) && !recordCredentialUse(credCount));
   prefs.fail=true;
@@ -128,7 +122,6 @@ int main() {
   assert(!setCredentialSort(SORT_COUNT));
   creds[0].useCount=UINT32_MAX;assert(recordCredentialUse(0));
   assert(creds[0].useCount==UINT32_MAX);
-  // Full vault: every mode is a permutation and obeys the comparator.
   while(credCount<MAX_CREDS) addCredential("same","u","p",credCount%3==0);
   for(int mode=0;mode<SORT_COUNT;mode++) {
     assert(setCredentialSort(mode));
@@ -139,7 +132,6 @@ int main() {
       if(p) assert(credentialComesBefore(credentialDisplayIndex(p-1),id));
     }
   }
-  // Category groups precede favorites; within each group favorites lead.
   prefs = Preferences{};credCount=0;
   assert(addCredential("legacy","u","password|with|pipes",true));
   assert(addCredential("social z","u","p",false,CATEGORY_SOCIAL));
@@ -148,7 +140,7 @@ int main() {
   assert(addCredential("bank","u","p",true,CATEGORY_BANK));
   assert(addCredential("work","u","p",false,CATEGORY_WORK));
   assert(setCredentialSort(SORT_CATEGORY));order({2,1,3,4,5,0});
-  assert(updateCredential(1,"social b","u","p")); // Missing type preserves it.
+  assert(updateCredential(1,"social b","u","p"));
   assert(creds[1].category==CATEGORY_SOCIAL);
   assert(updateCredential(1,"bank b","u","p",CATEGORY_BANK));order({2,3,4,1,5,0});
   memset(creds,0,sizeof(creds));loadCredentials();order({2,3,4,1,5,0});
@@ -164,7 +156,6 @@ int main() {
   assert(!updateCredential(0,"changed","u","p",CATEGORY_WORK));
   assert(creds[0].category==CATEGORY_NONE && std::string(creds[0].name)=="legacy");
   assert(!addCredential("failed","u","p",false,CATEGORY_WORK));
-  // Export every type, restore all fields and authenticate the format version.
   prefs=Preferences{};credCount=0;encrypted.clear();
   for(int type=0;type<CATEGORY_COUNT;type++)
     assert(addCredential(("account"+std::to_string(type)).c_str(),"user","p|with|pipes",type%2,type));
@@ -195,7 +186,6 @@ int main() {
   entries[0]="4|0|modified|user|pass";
   assert(importBackup("pw",KDF_ITERS,saltHex,verHex,macHex,entries,CATEGORY_COUNT,&skipped,3)==-2);
   assert(importBackup("pw",KDF_ITERS,saltHex,verHex,macHex,entries,MAX_CREDS+1,&skipped,3)==-2);
-  // Legacy backups default to Sem tipo; v1 has no favorites, v2 retains them.
   for(int version=1;version<=2;version++) {
     prefs=Preferences{};credCount=0;
     entries[0]=version==1?"legacy|user|p|pipe":"1|legacy|user|p|pipe";
@@ -204,12 +194,10 @@ int main() {
     assert(skipped==0 && creds[0].category==CATEGORY_NONE && creds[0].favorite==(version==2));
     assert(std::string(creds[0].pass)=="p|pipe");
   }
-  // Invalid categories are skipped without creating a partial credential.
   prefs=Preferences{};credCount=0;entries[0]="5|1|invalid|u|p";
   backupMac(key,String("3,")+saltHex,entries,1,mac);
   assert(importBackup("pw",KDF_ITERS,saltHex,verHex,bytesToHex(mac,32),entries,1,&skipped,3)==0);
   assert(skipped==1 && credCount==0);
-  // Production API: accept only known types, and preserve old-client behavior.
   prefs=Preferences{};credCount=0;
   server.args={{"name","Account"},{"user","u"},{"pass","p"}};
   handleSave();assert(credCount==1 && creds[0].category==CATEGORY_NONE);

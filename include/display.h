@@ -10,8 +10,6 @@
 #include "jd9853_init.h"
 #endif
 
-// Preserve the existing TFT_eSPI fonts and RGB565 drawing API. Only the
-// transport changes: render into PSRAM, then send one completed frame.
 class VaultDisplay {
   TFT_eSPI fontHost;
   TFT_eSprite canvas{&fontHost};
@@ -48,10 +46,9 @@ public:
     ready = true;
     return true;
   }
-  void setRotation(uint8_t) {} // All profiles use native portrait coordinates.
+  void setRotation(uint8_t) {}
   void present() {
     if (!ready || !dirty) return;
-    // TFT_eSprite stores 16-bit pixels in big-endian wire order.
     panel.draw16bitBeRGBBitmap(0, 0, static_cast<uint16_t*>(canvas.getPointer()), SCR_W, SCR_H);
     dirty = false;
   }
@@ -109,5 +106,4 @@ public:
 #endif
 
 extern VaultDisplay tft;
-// Ensure every return path in setup/loop publishes a completed frame.
 struct DisplayFrame { ~DisplayFrame() { tft.present(); } };

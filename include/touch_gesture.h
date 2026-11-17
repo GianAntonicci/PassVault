@@ -1,8 +1,6 @@
 #ifndef TOUCH_GESTURE_H
 #define TOUCH_GESTURE_H
 
-// Emit one event on release, regardless of the controller's interrupt rate.
-// Gesture values match the CST816 interface used by input.h.
 struct TouchGesture {
   bool down = false;
   int startX = 0, startY = 0, lastX = 0, lastY = 0;
@@ -23,7 +21,7 @@ struct TouchGesture {
       x = y = -1;
       gesture = dy > 0 ? 1 : 2;
     } else if (ax >= 40 || ay >= 40) {
-      return false;  // A drag must not activate the button at its starting point.
+      return false;
     }
     return true;
   }

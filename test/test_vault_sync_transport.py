@@ -1,7 +1,3 @@
-"""Exercise production sync state machine with fake WiFi, clock and crypto.
-These tests verify framing/lifecycle/auth-failure handling, not AES-GCM itself.
-Run: python3 test/test_vault_sync_transport.py
-"""
 from pathlib import Path
 import ast
 import subprocess
@@ -12,7 +8,7 @@ module = ast.parse((root / 'test/test_credential_sort.py').read_text())
 support = next(ast.literal_eval(n.value) for n in module.body
                if isinstance(n, ast.Assign) and any(isinstance(t, ast.Name) and t.id == 'support' for t in n.targets))
 core = (root / 'include/vault_core.h').read_text()
-struct = core[core.index('enum CredentialCategory'):core.index('// ---- Globals ----')]
+struct = core[core.index('enum CredentialCategory'):core.index('Preferences prefs;')]
 data = (root / 'include/vault_sync_data.h').read_text().replace('#include "vault_core.h"', '')
 transport = '\n'.join(line for line in (root / 'include/vault_sync.h').read_text().splitlines()
                       if not line.startswith('#include'))
@@ -70,7 +66,6 @@ struct WiFiServer {
   void begin() {}
   WiFiClient accept() { WiFiClient c;c.active=offered;offered=false;return c; }
 };
-// Deterministic stand-ins that bind key, IV, challenge, version and body.
 constexpr int MBEDTLS_MD_SHA256=0,MBEDTLS_CIPHER_ID_AES=0,MBEDTLS_GCM_ENCRYPT=1;
 int mbedtls_pkcs5_pbkdf2_hmac_ext(int,const uint8_t* p,size_t n,const uint8_t*,size_t,int,size_t k,uint8_t* out) {
   for(size_t i=0;i<k;i++)out[i]=p[i%n];return 0;
@@ -112,7 +107,6 @@ void assertOff() {
 int main() {
   syncStartSender();assert(strlen(syncCode)==12 && strlen(syncSsid)==21 && !WiFi.persist);
   std::string code=syncCode;
-  // A TCP connection alone cannot release credentials.
   offered=link=true;syncTick();assert(syncPhase==SYNC_WAIT_CONFIRM && outgoing.empty());
   incoming.assign(16,42);readLimit=3;
   for(int i=0;i<6;i++)syncTick();
@@ -123,12 +117,10 @@ int main() {
   while(syncPhase==SYNC_SENDING)syncTick();
   assert(syncPhase==SYNC_ACK && outgoing.size()==SYNC_PACKET_SIZE && syncPacket);
   auto packet=outgoing;
-  // A valid authenticated receipt is required before the source reports success.
   memset(syncAck,0,sizeof(syncAck));syncAck[1]=1;assert(syncReceipt(false));
   incoming.assign(syncAck,syncAck+sizeof(syncAck));inputOffset=0;
   while(syncPhase==SYNC_ACK)syncTick();
   assert(syncPhase==SYNC_FINISHED && syncAdded==1);assertOff();
-  // Receive in short fragments, never persist before complete authentication.
   for(int variant=0;variant<5;variant++) {
     syncStop();clearIo();prefs=Preferences();credCount=0;
     syncStarted=syncProgress=now;strcpy(syncCode,code.c_str());
@@ -147,7 +139,6 @@ int main() {
     assert(credCount==(variant==0?1:0));
     if(!variant)assert(strcmp(creds[0].pass,"p|secret")==0);
   }
-  // Lost/tampered receipts cannot claim success, even after a full TCP write.
   for(int variant=0;variant<3;variant++) {
     syncStop();clearIo();syncStarted=syncProgress=now;
     strcpy(syncCode,code.c_str());memset(syncChallenge,42,16);syncAllocate();
@@ -161,7 +152,6 @@ int main() {
     while(syncPhase==SYNC_ACK)syncTick();
     assert(syncPhase==SYNC_FAILED);assertOff();
   }
-  // Reject forged or missing delivery receipts without reporting success.
   for(int variant=0;variant<2;variant++) {
     syncStop();clearIo();syncStarted=syncProgress=now;
     strcpy(syncCode,code.c_str());assert(syncAllocate());
@@ -177,7 +167,6 @@ int main() {
   syncStartSender();now+=SYNC_SESSION_MS;syncTick();assert(syncPhase==SYNC_FAILED);assertOff();
   syncStartSender();offered=link=true;syncTick();now+=SYNC_IO_MS;syncTick();
   assert(syncPhase==SYNC_FAILED);assertOff();
-  // Only WPA2 PassVault sync networks, with duplicate SSIDs removed.
   syncStartScan();WiFi.networks={"home","PassVault-Sync-ABC123","PassVault-Sync-ABC123","PassVault-Sync-123ABC"};
   WiFi.security={3,3,3,0};WiFi.scanResult=4;syncTick();
   assert(syncPhase==SYNC_SELECT && syncNetworkCount==1 && !WiFi.reconnect);

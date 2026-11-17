@@ -7,7 +7,6 @@ using namespace fs;
 #include <WebServer.h>
 #include "config.h"
 
-// ---- extern from vault_core.h ----
 extern Credential creds[];
 extern int        credCount;
 extern bool addCredential(const char*, const char*, const char*, bool, uint8_t);
@@ -16,16 +15,14 @@ extern bool deleteCredential(int);
 
 WebServer server(80);
 bool      webRunning = false;
-char      webPass[AP_PASS_LEN + 1] = "";   // senha do AP, nova a cada ativacao
-unsigned long webLastRequest = 0;          // para o desligamento por inatividade
+char      webPass[AP_PASS_LEN + 1] = "";
+unsigned long webLastRequest = 0;
 
-// Marca atividade e impede cache de respostas com dados sensiveis
 void webTouch() {
   webLastRequest = millis();
   server.sendHeader("Cache-Control", "no-store");
 }
 
-// ---- JSON escape ----
 String jsonEsc(const char* s) {
   String out;
   while (*s) {
@@ -42,7 +39,6 @@ String jsonEsc(const char* s) {
   return out;
 }
 
-// ---- HTML SPA (PROGMEM) ----
 const char PAGE_HTML[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -330,8 +326,6 @@ loadLanguage().then(()=>loadSort()).then(()=>load()).catch(()=>msg(tr('load_erro
 </html>
 )rawliteral";
 
-// ---- API Handlers ----
-
 void handleRoot() {
   webTouch();
   server.send_P(200, "text/html", PAGE_HTML);
@@ -438,7 +432,6 @@ void handleFavorite() {
   bool valid = idArg.length() > 0 && (value == "0" || value == "1");
   for (size_t i = 0; i < idArg.length(); i++)
     if (!isDigit(idArg[i])) valid = false;
-  // IDs validos tem no maximo dois digitos (MAX_CREDS = 30).
   if (!valid || idArg.length() > String(MAX_CREDS - 1).length()) {
     server.send(400, "application/json", "{\"ok\":false}");
     return;
@@ -495,9 +488,6 @@ void handleImport() {
                                        ",\"skipped\":" + String(skipped) + "}");
 }
 
-// ---- Start / Stop / Tick ----
-
-// Senha aleatoria sem caracteres ambiguos (0/O, 1/l/I)
 void genWebPass() {
   static const char cs[] = "abcdefghjkmnpqrstuvwxyzACDEFGHJKLMNPQRTUVWXY346789";
   for (int i = 0; i < AP_PASS_LEN; i++) webPass[i] = cs[esp_random() % (sizeof(cs) - 1)];
@@ -506,7 +496,6 @@ void genWebPass() {
 
 void startWeb() {
   genWebPass();
-  // canal 1, SSID visivel, no maximo 1 cliente conectado
   WiFi.softAP(AP_SSID, webPass, 1, 0, 1);
   webLastRequest = millis();
   server.on("/",          handleRoot);

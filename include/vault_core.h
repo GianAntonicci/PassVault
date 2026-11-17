@@ -10,7 +10,6 @@
 #include "config.h"
 #include "localization.h"
 
-// ---- Credential struct ----
 enum CredentialCategory : uint8_t {
   CATEGORY_NONE, CATEGORY_SOCIAL, CATEGORY_EMAIL, CATEGORY_BANK, CATEGORY_WORK, CATEGORY_COUNT
 };
@@ -25,7 +24,6 @@ struct Credential {
   uint8_t category;
 };
 
-// ---- Globals ----
 Preferences prefs;
 Credential  creds[MAX_CREDS];
 int         credCount = 0;
@@ -33,6 +31,7 @@ uint8_t     aesKey[32];
 uint8_t     salt[16];
 unsigned long autoLockMs = AUTOLOCK_MS;
 uint8_t displayBrightness = BRIGHTNESS_DEFAULT;
+bool statusLedEnabled = true;
 bool storageReady = false;
 
 enum CredentialSort : uint8_t { SORT_ALPHA, SORT_RECENT, SORT_USED, SORT_CATEGORY, SORT_COUNT };
@@ -47,7 +46,6 @@ bool setCredentialSort(uint8_t mode) {
   return true;
 }
 
-// Um uso por envio (Tudo/Login/Senha), sem contar visualizacoes.
 bool recordCredentialUse(int idx) {
   if (idx < 0 || idx >= credCount) return false;
   if (creds[idx].useCount == UINT32_MAX) return true;
@@ -86,7 +84,13 @@ bool setBrightness(uint8_t percent) {
   return true;
 }
 
-// O idioma e compartilhado pela tela e web; nao integra backups de credenciais.
+bool setStatusLed(bool enabled) {
+  if (enabled == statusLedEnabled) return true;
+  if (prefs.putBool("led", enabled) != sizeof(bool)) return false;
+  statusLedEnabled = enabled;
+  return true;
+}
+
 bool setLanguage(uint8_t language) {
   if (language >= LANGUAGE_COUNT) return false;
   if (language == activeLanguage) return true;
@@ -95,9 +99,6 @@ bool setLanguage(uint8_t language) {
   return true;
 }
 
-// ---- Crypto helpers ----
-
-// v1 (legado): chave = SHA-256(salt || PIN). Usado so para migrar.
 void deriveKeyV1(const char* pin) {
   mbedtls_sha256_context ctx;
   mbedtls_sha256_init(&ctx);
@@ -108,7 +109,6 @@ void deriveKeyV1(const char* pin) {
   mbedtls_sha256_free(&ctx);
 }
 
-// v1 (legado): verificador = SHA-256(SHA-256(PIN)). Usado so para migrar.
 String hashPinV1(const char* pin) {
   uint8_t h1[32], h2[32];
   mbedtls_sha256_context ctx;
@@ -184,7 +184,6 @@ String decryptData(const String& hexData, const uint8_t* key = aesKey) {
   mbedtls_aes_crypt_cbc(&aes, MBEDTLS_AES_DECRYPT, cLen, iv, cipher, cipher);
   mbedtls_aes_free(&aes);
 
-  // PKCS#7: 1..16 bytes, todos iguais — senao a chave/dado esta errado
   uint8_t pad = cLen ? cipher[cLen - 1] : 0;
   bool padOk = cLen > 0 && (cLen % 16) == 0 && pad >= 1 && pad <= 16;
   for (size_t i = 0; padOk && i < pad; i++) padOk = cipher[cLen - 1 - i] == pad;
@@ -205,11 +204,6 @@ String decryptData(const String& hexData, const uint8_t* key = aesKey) {
   return result;
 }
 
-// ---- KDF v2 ----
-// master = PBKDF2-HMAC-SHA256(PIN, salt, KDF_ITERS)
-// chave AES   = SHA-256(master || "key")
-// verificador = SHA-256(master || "ver")  (o PIN nunca e salvo)
-
 void sha256Tagged(const uint8_t* in, size_t len, const char* tag, uint8_t* out) {
   mbedtls_sha256_context ctx;
   mbedtls_sha256_init(&ctx);
@@ -220,7 +214,6 @@ void sha256Tagged(const uint8_t* in, size_t len, const char* tag, uint8_t* out) 
   mbedtls_sha256_free(&ctx);
 }
 
-// Permite preparar um novo PIN sem substituir a chave da sessao atual.
 bool derivePinKey(const char* pin, const uint8_t* pinSalt, uint8_t* key, uint8_t* verifier) {
   uint8_t master[32];
   int result = mbedtls_pkcs5_pbkdf2_hmac_ext(MBEDTLS_MD_SHA256,
@@ -235,33 +228,21 @@ bool derivePinKey(const char* pin, const uint8_t* pinSalt, uint8_t* key, uint8_t
   return result == 0;
 }
 
-// Deriva chave (aesKey) e verificador a partir do PIN e do salt atual
 void deriveKeyV2(const char* pin, uint8_t* verifier) {
   derivePinKey(pin, salt, aesKey, verifier);
 }
 
-// Comparacao em tempo constante
 bool ctEqual(const uint8_t* a, const uint8_t* b, size_t n) {
   uint8_t d = 0;
   for (size_t i = 0; i < n; i++) d |= a[i] ^ b[i];
   return d == 0;
 }
 
-// ---- Storage ----
-// Chaves NVS: ver (formato), salt2 + pv2 (salt e verificador v2),
-//             plen (tamanho do PIN), fails (tentativas erradas),
-//             cnt, c0..cN (credenciais cifradas), m0..mN (temporarias da migracao)
-//             f0..fN (favoritas; ausente = false), u0..uN (usos; ausente = 0),
-//             t0..tN (tipo; ausente/invalido = Sem tipo),
-//             sort (ordenacao; ausente = alfabetica),
-//             salt + pin (formato v1, so em vaults antigos)
-
 #define VAULT_FORMAT  2
 
 void loadCredentials();
 void saveSingleCred(int idx);
 
-// Conclui uma migracao interrompida (m_i ja cifradas com a chave v2)
 void finishMigration() {
   if (!prefs.isKey("pv2")) return;
   int n = prefs.getInt("cnt", 0);
@@ -277,9 +258,6 @@ void finishMigration() {
   prefs.remove("salt");
 }
 
-// Transacao de troca de PIN: pvnext guarda uma copia completa recifrada.
-// pinchange e o ponto de commit. Depois dele, a copia e reaplicada ate terminar,
-// inclusive se faltar energia durante a substituicao de c_i/salt2/pv2/plen.
 bool finishPinChange() {
   if (!prefs.getBool("pinchange", false)) return true;
   Preferences next;
@@ -290,7 +268,6 @@ bool finishPinChange() {
   bool ok = count >= 0 && count <= MAX_CREDS && length > 0 && length <= PIN_LEN_MAX &&
             next.getBytes("salt2", newSalt, sizeof(newSalt)) == sizeof(newSalt) &&
             next.getBytes("pv2", verifier, sizeof(verifier)) == sizeof(verifier);
-  // Confere todos os registros antes de comecar a substituir os dados ativos.
   for (int i = 0; ok && i < count; i++) {
     char key[5]; snprintf(key, sizeof(key), "c%d", i);
     String enc = next.getString(key, "");
@@ -309,14 +286,12 @@ bool finishPinChange() {
   next.end();
   mbedtls_platform_zeroize(newSalt, sizeof(newSalt));
   mbedtls_platform_zeroize(verifier, sizeof(verifier));
-  // A copia temporaria so e descartada depois da remocao do marcador.
   if (ok && next.begin("pvnext", false)) { next.clear(); next.end(); }
   return ok;
 }
 
 enum PinChangeResult { PIN_CHANGE_FAILED, PIN_CHANGE_OK, PIN_CHANGE_PENDING };
 
-// Chamar apenas depois de validar o PIN atual. Nao altera favoritas/configuracoes.
 PinChangeResult changePin(const char* pin) {
   size_t length = strlen(pin);
   if (length != PIN_LEN || prefs.getBool("pinchange", false)) return PIN_CHANGE_FAILED;
@@ -332,7 +307,6 @@ PinChangeResult changePin(const char* pin) {
   bool ok = next.clear() && derivePinKey(pin, newSalt, key, verifier);
   for (int i = 0; ok && i < credCount; i++) {
     char name[5]; snprintf(name, sizeof(name), "c%d", i);
-    // Recifra o registro armazenado; nao depende de um carregamento parcial em RAM.
     String enc = prefs.getString(name, "");
     if (enc.length() < 64 || enc.length() % 32 != 0) { ok = false; break; }
     String plain = decryptData(enc);
@@ -376,6 +350,7 @@ bool storageBegin() {
                         ? brightness : BRIGHTNESS_DEFAULT;
   uint8_t mode = prefs.getUChar("sort", SORT_ALPHA);
   credentialSort = mode < SORT_COUNT ? mode : uint8_t(SORT_ALPHA);
+  statusLedEnabled = prefs.getBool("led", true);
   loadLanguagePreference();
   storageReady = true;
   return true;
@@ -385,17 +360,14 @@ bool storageHasPin() {
   return prefs.isKey("pv2") || prefs.isKey("pin");
 }
 
-// Tamanho do PIN cadastrado (vaults v1 usavam 4 digitos)
 int storagePinLen() {
   return prefs.getUChar("plen", prefs.isKey("pin") ? 4 : PIN_LEN);
 }
 
-// ---- Contador persistente de tentativas (sobrevive a reboot) ----
 int storageFails() {
   return prefs.getUChar("fails", 0);
 }
 
-// Incrementa ANTES de verificar: cortar a energia no meio nao zera o contador
 int storageAddFail() {
   int f = storageFails() + 1;
   prefs.putUChar("fails", f > 255 ? 255 : f);
@@ -406,10 +378,8 @@ void storageResetFails() {
   if (storageFails()) prefs.putUChar("fails", 0);
 }
 
-// Apaga TODO o vault (PIN, salt e credenciais)
 void storageWipe() {
   prefs.clear();
-  // Inclui qualquer copia temporaria deixada por uma troca interrompida.
   Preferences next;
   if (next.begin("pvnext", false)) { next.clear(); next.end(); }
   mbedtls_platform_zeroize(aesKey, sizeof(aesKey));
@@ -417,7 +387,6 @@ void storageWipe() {
   credCount = 0;
 }
 
-// Novo salt + chave v2 em RAM; "pv2" gravado por ultimo = ponto de commit
 void setupPin(const char* pin) {
   uint8_t verifier[32];
   esp_fill_random(salt, 16);
@@ -429,10 +398,8 @@ void setupPin(const char* pin) {
   mbedtls_platform_zeroize(verifier, sizeof(verifier));
 }
 
-// Migra vault v1 -> v2 mantendo o PIN. Seguro contra queda de energia:
-// recifra tudo em m_i, faz o commit (pv2) e so entao substitui c_i.
 void migrateV1(const char* pin) {
-  loadCredentials();                     // decifra com a chave v1
+  loadCredentials();
   uint8_t verifier[32];
   esp_fill_random(salt, 16);
   deriveKeyV2(pin, verifier);
@@ -446,7 +413,7 @@ void migrateV1(const char* pin) {
   prefs.putUChar("plen", strlen(pin));
   prefs.putUChar("ver", VAULT_FORMAT);
   prefs.putBytes("salt2", salt, 16);
-  prefs.putBytes("pv2", verifier, 32);   // commit
+  prefs.putBytes("pv2", verifier, 32);
   mbedtls_platform_zeroize(verifier, sizeof(verifier));
   finishMigration();
 }
@@ -463,7 +430,6 @@ bool verifyPin(const char* pin) {
     return ok;
   }
 
-  // Vault v1
   prefs.getBytes("salt", salt, 16);
   String stored = prefs.getString("pin", "");
   if (stored.length() == 0) return false;
@@ -543,7 +509,6 @@ bool addCredential(const char* name, const char* user, const char* pass, bool fa
   return true;
 }
 
-// O sentinela preserva o tipo para clientes antigos que nao enviam esse campo.
 bool updateCredential(int idx, const char* name, const char* user, const char* pass,
                       uint8_t category = CATEGORY_COUNT) {
   if (idx < 0 || idx >= credCount) return false;
@@ -555,7 +520,6 @@ bool updateCredential(int idx, const char* name, const char* user, const char* p
   return true;
 }
 
-// Atualiza apenas a marca, sem recifrar a credencial ou mudar seu ID.
 bool setCredentialFavorite(int idx, bool favorite) {
   if (idx < 0 || idx >= credCount) return false;
   char key[4];
@@ -565,10 +529,6 @@ bool setCredentialFavorite(int idx, bool favorite) {
   return true;
 }
 
-// Ordenacao apenas para exibicao: IDs de armazenamento continuam estaveis.
-// No modo Por tipo, favoritas primeiro dentro de cada grupo; Sem tipo por ultimo.
-// Nos demais modos, favoritas primeiro. O indice preserva a ordem de cadastro,
-// inclusive apos exclusoes; editar nao transforma uma conta em cadastro recente.
 bool credentialComesBefore(int a, int b) {
   if (credentialSort == SORT_CATEGORY && creds[a].category != creds[b].category) {
     int ca = creds[a].category ? creds[a].category : CATEGORY_COUNT;
@@ -617,15 +577,6 @@ bool deleteCredential(int idx) {
   return true;
 }
 
-// ---- Backup (exportar/importar) ----
-// Arquivo JSON independente do PIN e do aparelho:
-//   bmaster = PBKDF2-HMAC-SHA256(senha do backup, bsalt, iter)
-//   chave = SHA-256(bmaster||"bkey"), verificador = SHA-256(bmaster||"bver"),
-//   chave do MAC = SHA-256(bmaster||"bmac"); MAC = HMAC(salt + "," + c0 + "," + c1 ...)
-// v2/v3 incluem a versao antes do salt no MAC para autentica-la.
-// v1: name|user|pass; v2: favorite|name|user|pass; v3: category|favorite|name|user|pass
-// -> AES-256-CBC (IV aleatorio) -> hex
-
 #define BACKUP_ITERS_MIN  1000
 #define BACKUP_ITERS_MAX  200000
 
@@ -672,7 +623,6 @@ void backupMac(const uint8_t* macKey, const String& saltHex,
   mbedtls_md_free(&ctx);
 }
 
-// Gera o JSON do backup com todas as credenciais
 String exportBackup(const char* pw) {
   uint8_t bsalt[16], key[32], ver[32], macKey[32], mac[32];
   esp_fill_random(bsalt, 16);
@@ -702,8 +652,6 @@ String exportBackup(const char* pw) {
   return json;
 }
 
-// Importa credenciais de um backup, ignorando duplicadas (mesmo nome+usuario).
-// Retorno: >=0 adicionadas, -1 senha errada, -2 arquivo invalido/alterado
 int importBackup(const char* pw, int iters, const String& saltHex, const String& verHex,
                  const String& macHex, const String* entries, int n, int* skipped, int version = 1) {
   uint8_t bsalt[16], fver[32], fmac[32], key[32], ver[32], macKey[32], mac[32];

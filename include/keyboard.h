@@ -1,10 +1,6 @@
 #ifndef KEYBOARD_H
 #define KEYBOARD_H
 
-// =====================================================================
-//  Teclado USB HID nativo (ESP32-S3)
-// =====================================================================
-
 #include <Arduino.h>
 #include "config.h"
 
@@ -20,7 +16,6 @@ void kbdBegin() {
   USB.begin();
 }
 
-// USB: sempre "conectado" quando enumerado pelo host
 bool kbdConnected() { return true; }
 const char* kbdLabel() { return "USB"; }
 

@@ -1,16 +1,8 @@
-/*
- *  PassVault — Password Manager
- *  Multi-placa: ver BOARD_XXX em platformio.ini / config.h
- *  TFT_eSPI + input.h (touch/botoes) + keyboard.h (USB HID)
- *  PlatformIO build
- */
-
 #include <Arduino.h>
 #include "display.h"
 #include "config.h"
 #include "ui_layout.h"
 
-// ---- Objects ----
 VaultDisplay tft;
 
 #include "input.h"
@@ -19,14 +11,21 @@ VaultDisplay tft;
 #include "vault_web.h"
 #include "vault_sync.h"
 #include "screen_fade.h"
+#include "status_led.h"
 
-// ---- State machine ----
 enum State { ST_PIN_SETUP, ST_PIN_CONFIRM, ST_PIN_ENTRY, ST_MENU, ST_DETAIL, ST_WEB, ST_SEARCH, ST_SETTINGS, ST_THEMES, ST_BRIGHTNESS, ST_SORT,
              ST_PIN_CURRENT, ST_PIN_NEW, ST_PIN_NEW_CONFIRM, ST_LANGUAGES, ST_SYNC };
 State state = ST_PIN_ENTRY;
 ScreenFade screenFade;
+StatusLed statusLed;
 
-// O fade multiplica o brilho escolhido sem alterar a preferencia na NVS.
+StatusLedColor statusLedColor() {
+  if (!statusLedEnabled) return LED_OFF;
+  if (WiFi.getMode() != WIFI_OFF) return LED_WIFI;
+  if (state == ST_PIN_SETUP || state == ST_PIN_CONFIRM || state == ST_PIN_ENTRY) return LED_LOCKED;
+  return LED_UNLOCKED;
+}
+
 void applyBrightness() {
   int duty = (displayBrightness * 255 + 50) / 100;
   duty = (duty * screenFade.level + 127) / 255;
@@ -34,7 +33,6 @@ void applyBrightness() {
 }
 
 void beginScreen() {
-  // Apaga o backlight antes de substituir os pixels da tela anterior.
   if (screenFade.begin(state, millis())) applyBrightness();
 }
 
@@ -46,7 +44,7 @@ void cancelScreenFade() {
 char pinBuf[PIN_LEN_MAX + 1]     = "";
 char pinConfirm[PIN_LEN_MAX + 1] = "";
 int  pinPos   = 0;
-int  pinLen   = PIN_LEN;   // vault novo usa PIN_LEN; vault existente, o tamanho salvo
+int  pinLen   = PIN_LEN;
 int  selCred  = 0;
 int  menuTop  = 0;
 bool detailPasswordVisible = false;
@@ -56,7 +54,6 @@ bool typingFeedbackVisible = false;
 unsigned long typingFeedbackShownAt = 0;
 const unsigned long TYPING_FEEDBACK_MS = 900;
 
-// Busca por nome: filtro aplicado a lista do menu
 char searchBuf[33] = "";
 int  filt[MAX_CREDS];
 int  filtCount = 0;
@@ -65,7 +62,6 @@ unsigned long lockoutEnd = 0;
 unsigned long lockoutTick = 0;
 unsigned long lastAction = 0;
 
-// ---- Forward declarations ----
 void drawMenu();
 void drawDetail();
 void drawWebScreen();
@@ -92,7 +88,6 @@ bool inBox(int tx, int ty, int bx, int by, int bw, int bh) {
   return tx >= bx && tx < bx + bw && ty >= by && ty < by + bh;
 }
 
-// Botao clicavel — tambem vira alvo de foco na placa so com botoes
 void btn(int x, int y, int w, int h, const char* label, uint16_t bg) {
   tft.fillRoundRect(x, y, w, h, 5, bg);
   tft.setTextColor(C_BG, bg);
@@ -101,7 +96,6 @@ void btn(int x, int y, int w, int h, const char* label, uint16_t bg) {
   focusAdd(x, y, w, h);
 }
 
-// ---- Numpad ----
 const char* npLabels[12] = {"1","2","3","4","5","6","7","8","9","C","0","<"};
 
 int npX0() { return (SCR_W - (NP_COLS * NP_BW + (NP_COLS - 1) * NP_GAP)) / 2; }
@@ -133,9 +127,7 @@ int hitNumpad(int tx, int ty) {
   return -1;
 }
 
-// ---- PIN Screen ----
 void drawPinBoxes() {
-  // Encolhe as caixas quando o PIN e longo (6+ digitos no portrait)
   int gap = pinLen > 4 ? 5 : 8;
   int bw  = min(28, (SCR_W - 16 - (pinLen - 1) * gap) / pinLen);
   int x0 = (SCR_W - (pinLen * bw + (pinLen - 1) * gap)) / 2;
@@ -157,7 +149,7 @@ void drawPinScreen(const char* title) {
   tft.fillScreen(C_BG);
   tft.setTextColor(C_ACCENT);
   tft.setTextDatum(TC_DATUM);
-    tft.drawString(title, SCR_W / 2, PIN_TITLE_Y, 4);
+  tft.drawString(title, SCR_W / 2, PIN_TITLE_Y, 4);
 
   tft.setTextColor(C_DIM);
   tft.setTextDatum(TC_DATUM);
@@ -193,7 +185,6 @@ void clearPinBuffers() {
   pinPos = 0;
 }
 
-// Espera para um dado numero de erros: LOCKOUT_MS, dobrando a cada erro extra
 unsigned long lockoutDuration(int fails) {
   if (fails < LOCKOUT_AFTER) return 0;
   unsigned long ms = LOCKOUT_MS;
@@ -230,7 +221,6 @@ void startLockout(int fails) {
   drawLockout();
 }
 
-// Limite atingido: apaga o vault e reinicia na criacao do PIN.
 void wipeVault() {
   cancelScreenFade();
   storageWipe();
@@ -262,13 +252,13 @@ void handlePinTouch(int tx, int ty) {
   int key = hitNumpad(tx, ty);
   if (key < 0) return;
 
-  if (key == 9) { // C = clear
+  if (key == 9) {
     pinPos = 0;
     pinBuf[0] = 0;
     drawPinBoxes();
     return;
   }
-  if (key == 11) { // < = backspace
+  if (key == 11) {
     pinBackspace();
     return;
   }
@@ -325,7 +315,7 @@ void handlePinTouch(int tx, int ty) {
       clearPinBuffers();
       if (result == PIN_CHANGE_PENDING) {
         clearMemory();
-        ESP.restart();  // replay da transacao antes de permitir novo desbloqueio
+        ESP.restart();
         return;
       }
       lockDevice();
@@ -333,7 +323,6 @@ void handlePinTouch(int tx, int ty) {
       else drawPinWarn(tr(TXT_SAVE_FAILED));
     } else if (state == ST_PIN_ENTRY || state == ST_PIN_CURRENT) {
       bool change = state == ST_PIN_CURRENT;
-      // Conta o erro ANTES de verificar: desligar no meio nao zera o contador
       int fails = storageAddFail();
       drawBusy(tr(TXT_VERIFYING));
       bool ok = verifyPin(pinBuf);
@@ -351,7 +340,6 @@ void handlePinTouch(int tx, int ty) {
           drawMenu();
         }
       } else {
-        // A verificacao invalida a chave em RAM: termina a sessao desbloqueada.
         if (change) lockDevice();
         if (WIPE_AFTER > 0 && fails >= WIPE_AFTER) { wipeVault(); return; }
         if (fails >= LOCKOUT_AFTER) { startLockout(fails); return; }
@@ -364,23 +352,19 @@ void handlePinTouch(int tx, int ty) {
   }
 }
 
-// ---- Menu ----
 #define MENU_ITEM_H  36
 #define MENU_VISIBLE ((SCR_H - 65 - MENU_LIST_Y) / MENU_ITEM_H)
 #define MENU_BTN_W   75
 #define MENU_BTN_H   38
 
-// Campo de busca em uma linha propria
-  #define SRCH_X       4
-  #define SRCH_Y       40
-  #define SRCH_W       (SCR_W - 8)
-  #define MENU_LIST_Y  72
+#define SRCH_X       4
+#define SRCH_Y       40
+#define SRCH_W       (SCR_W - 8)
+#define MENU_LIST_Y  72
 #define SRCH_H       26
 
-// Placas sem gesto de swipe ganham uma coluna de botoes cima/baixo ao lado da lista
 #ifdef MENU_SCROLL_BTNS
   #define MENU_SCR_W   44
-  // Cards so cedem espaco aos botoes quando ha rolagem
   #define MENU_ITEM_W  (filtCount > MENU_VISIBLE ? SCR_W - 8 - MENU_SCR_W - 4 : SCR_W - 8)
   #define MENU_SCR_X   (SCR_W - 4 - MENU_SCR_W)
   #define MENU_SCR_H   ((MENU_VISIBLE * MENU_ITEM_H - 2 - 4) / 2)
@@ -398,7 +382,6 @@ void drawScrollBtn(int y, bool up, bool enabled) {
   #define MENU_ITEM_W  (SCR_W - 8)
 #endif
 
-// Indicador do teclado USB
 bool kbdShownConnected = false;
 
 void drawKbdStatus() {
@@ -409,7 +392,6 @@ void drawKbdStatus() {
   tft.drawString(kbdLabel(), SCR_W - 10, 12, 2);
 }
 
-// Substring sem diferenciar maiusculas
 bool nameMatches(const char* name, const char* q) {
   int nl = strlen(name), ql = strlen(q);
   for (int i = 0; i + ql <= nl; i++) {
@@ -420,7 +402,6 @@ bool nameMatches(const char* name, const char* q) {
   return false;
 }
 
-// Refeito a cada desenho: credenciais podem mudar pela web
 void applyFilter() {
   filtCount = 0;
   for (int position = 0; position < credCount; position++) {
@@ -477,7 +458,6 @@ void drawMenu() {
       tft.setTextColor(C_CATEGORY[category]);
       const TextId categoryLabels[] = { TXT_CAT_NONE, TXT_CAT_SOCIAL, TXT_CAT_EMAIL, TXT_CAT_BANK, TXT_CAT_WORK };
       tft.drawFitString(tr(categoryLabels[category]), 12, y + 17, 2, MENU_ITEM_W - 16);
-      // Bordas da lista rolam ao inves de mover o foco
       uint8_t flags = 0;
       if (i == menuTop && menuTop > 0) flags |= FOCUS_SCROLL_UP;
       if (i == menuTop + visible - 1 && i + 1 < filtCount) flags |= FOCUS_SCROLL_DOWN;
@@ -503,7 +483,6 @@ void handleMenuTouch(int tx, int ty, int gesture) {
   int btnY = SCR_H - MENU_BTN_H - 6;
 
 #ifdef MENU_SCROLL_BTNS
-  // Botoes de rolagem equivalem aos gestos de swipe
   if (filtCount > MENU_VISIBLE) {
     if (inBox(tx, ty, MENU_SCR_X, MENU_UP_Y, MENU_SCR_W, MENU_SCR_H)) gesture = GESTURE_SWIPE_DOWN;
     if (inBox(tx, ty, MENU_SCR_X, MENU_DN_Y, MENU_SCR_W, MENU_SCR_H)) gesture = GESTURE_SWIPE_UP;
@@ -550,8 +529,6 @@ void handleMenuTouch(int tx, int ty, int gesture) {
   }
 }
 
-// ---- Busca (teclado na tela) ----
-// 36 teclas A-Z/0-9 + linha de acoes: 0=apagar 1=limpar 2=OK
 const char kbChars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
 const uint16_t kbActColors[3] = {C_WARN, C_WARN, C_OK};
@@ -622,10 +599,8 @@ void handleSearchTouch(int tx, int ty) {
   }
 }
 
-// ---- Detail ----
 void drawTypingFeedback(const char* message, uint16_t color) {
   cancelScreenFade();
-  // Oculta os dados e retira o foco dos botoes durante o envio.
   detailPasswordVisible = false;
   focusBegin(-1);
   tft.fillScreen(C_BG);
@@ -665,8 +640,6 @@ void typeCredential(int mode) {
   lastAction = millis();
 }
 
-// Botoes do detalhe: 0=Tudo 1=Login 2=Senha 3=Voltar 4=Revelar 5=Favoritar 6=Entrar
-// Entrar envia login + Tab + senha + Enter (modo 3).
 void detailBtnPos(int i, int &x, int &y) {
   int columns = DET_COLS;
   int rowCount = min(columns, DET_BTN_COUNT - (i / columns) * columns);
@@ -678,8 +651,6 @@ void detailBtnPos(int i, int &x, int &y) {
 const TextId detLabels[DET_BTN_COUNT] = { TXT_ALL, TXT_LOGIN, TXT_PASSWORD, TXT_BACK, TXT_REVEAL, TXT_FAVORITE, TXT_ENTER };
 
 void drawDetailPassword() {
-  // Fonte de 6x8: ate 64 caracteres cabem em 3 linhas no portrait.
-  // Limpa toda a area para remover tambem as linhas da senha revelada.
   tft.fillRect(0, DET_PASS_Y, SCR_W, 24, C_BG);
   tft.setTextColor(C_TEXT, C_BG);
   const int cols = (SCR_W - 20) / 6;
@@ -745,7 +716,6 @@ void handleDetailTouch(int tx, int ty) {
   }
 }
 
-// ---- Configuracoes ----
 void drawSettings() {
   beginScreen();
   focusBegin(ST_SETTINGS);
@@ -777,6 +747,7 @@ void drawSettings() {
 #define BRIGHT_BTN_Y  108
 #define BRIGHT_BTN_W  ((SETTINGS_W - 12) / 2)
 #define BRIGHT_BTN_H  38
+#define BRIGHT_LED_Y  (BRIGHT_BTN_Y + BRIGHT_BTN_H + 32)
 
 void drawBrightness(const char* status = "", bool failed = false) {
   beginScreen();
@@ -794,11 +765,21 @@ void drawBrightness(const char* status = "", bool failed = false) {
   tft.setTextColor(failed ? C_WARN : C_TEXT);
   tft.setTextDatum(TC_DATUM);
   tft.drawString(status, SCR_W / 2, BRIGHT_BTN_Y + BRIGHT_BTN_H + 12, 2);
+#ifdef HAS_STATUS_LED
+  btn(SETTINGS_X, BRIGHT_LED_Y, SETTINGS_W, SETTINGS_H, tr(statusLedEnabled ? TXT_LED_ON : TXT_LED_OFF), C_ACCENT);
+#endif
   btn(SETTINGS_X, SETTINGS_BACK_Y, SETTINGS_W, SETTINGS_H, tr(TXT_BACK), C_BTN);
   focusEnd();
 }
 
 void handleBrightnessTouch(int tx, int ty) {
+#ifdef HAS_STATUS_LED
+  if (inBox(tx, ty, SETTINGS_X, BRIGHT_LED_Y, SETTINGS_W, SETTINGS_H)) {
+    bool saved = setStatusLed(!statusLedEnabled);
+    drawBrightness(tr(saved ? TXT_SAVED : TXT_SAVE_FAILED), !saved);
+    return;
+  }
+#endif
   int next = displayBrightness;
   if (inBox(tx, ty, SETTINGS_X, BRIGHT_BTN_Y, BRIGHT_BTN_W, BRIGHT_BTN_H))
     next = max(BRIGHTNESS_MIN, next - BRIGHTNESS_STEP);
@@ -815,7 +796,6 @@ void handleBrightnessTouch(int tx, int ty) {
   drawBrightness(saved ? tr(TXT_BRIGHTNESS_SAVED) : tr(TXT_SAVE_FAILED), !saved);
 }
 
-// ---- Aba de temas: selecao com aplicacao imediata ----
 #define THEME_Y      38
 #define THEME_H      28
 #define THEME_STEP   34
@@ -886,7 +866,6 @@ void handleSortTouch(int tx, int ty) {
   }
 }
 
-// Quatro idiomas por pagina cabem inclusive na tela 240x240 e no foco por botoes.
 constexpr int LANGUAGE_PAGE_SIZE = 4;
 constexpr int LANGUAGE_Y = 38, LANGUAGE_STEP = 32, LANGUAGE_H = 28;
 constexpr int LANGUAGE_NAV_Y = 170, LANGUAGE_NAV_H = 28;
@@ -977,7 +956,6 @@ void handleSettingsTouch(int tx, int ty) {
   }
 }
 
-// ---- Device-to-device sync (all controls also participate in button focus) ----
 #define SYNC_ACTION_Y (SCR_H - 100)
 #define SYNC_SECOND_Y (SCR_H - 66)
 #define SYNC_BACK_Y (SCR_H - 32)
@@ -1090,7 +1068,6 @@ void handleSyncTouch(int tx, int ty) {
   drawSync();
 }
 
-// ---- Web Screen ----
 #define WEB_BTN_W  140
 #define WEB_BTN_H  42
 
@@ -1129,7 +1106,6 @@ void handleWebTouch(int tx, int ty) {
   }
 }
 
-// ---- Gesto "voltar" (botao fisico segurado) ----
 void handleBack() {
   switch (state) {
     case ST_PIN_CURRENT:
@@ -1143,7 +1119,6 @@ void handleBack() {
       pinBackspace();
       break;
     case ST_MENU:
-      // Com filtro ativo, "voltar" limpa a busca antes de bloquear
       if (searchBuf[0]) { clearSearch(); drawMenu(); }
       else lockDevice();
       break;
@@ -1173,7 +1148,6 @@ void handleBack() {
   }
 }
 
-// ---- Lock ----
 void lockDevice() {
   if (state == ST_SYNC) syncStop();
   if (webRunning) stopWeb();
@@ -1187,7 +1161,6 @@ void lockDevice() {
   drawPinScreen(tr(TXT_ENTER_PIN));
 }
 
-// ===================== SETUP =====================
 void setup() {
   DisplayFrame frame;
 #if PIN_POWER_ON >= 0
@@ -1222,13 +1195,11 @@ void setup() {
     return;
   }
 
-  // TFT_eSPI inicializa o backlight ligado: restaura o PWM depois do init.
   applyBrightness();
 
   if (storageHasPin()) {
     pinLen = storagePinLen();
     state = ST_PIN_ENTRY;
-    // Reiniciar nao pula o bloqueio: a espera recomeca do zero
     if (storageFails() >= LOCKOUT_AFTER) startLockout(storageFails());
     else drawPinScreen(tr(TXT_ENTER_PIN));
   } else {
@@ -1240,18 +1211,15 @@ void setup() {
   lastAction = millis();
 }
 
-// ===================== LOOP =====================
 void loop() {
   DisplayFrame frame;
   if (!storageReady) return;
+  statusLed.show(statusLedColor());
   if (screenFade.tick(millis())) applyBrightness();
-  // Mantem a confirmacao visivel sem bloquear o loop ou o auto-lock.
   if (state == ST_DETAIL && typingFeedbackVisible &&
       millis() - typingFeedbackShownAt >= TYPING_FEEDBACK_MS) {
     drawDetail();
   }
-  // Sem delay: o dispositivo continua respondendo durante os 3 segundos.
-  // Subtracao sem sinal mantem o prazo correto mesmo quando millis() transborda.
   if (state == ST_DETAIL && detailPasswordVisible &&
       millis() - detailPasswordShownAt >= DETAIL_REVEAL_MS) {
     detailPasswordVisible = false;
@@ -1259,7 +1227,6 @@ void loop() {
   }
 
   if (lockoutEnd > 0 && millis() < lockoutEnd) {
-    // Contagem regressiva, 1x por segundo
     if (millis() - lockoutTick >= 1000) {
       lockoutTick = millis();
       drawLockout();
@@ -1277,14 +1244,12 @@ void loop() {
     bool ready = syncPhase == SYNC_WAIT_CONFIRM && syncOffset == sizeof(syncChallenge);
     syncTick();
     if (previous != syncPhase || ready != (syncPhase == SYNC_WAIT_CONFIRM && syncOffset == sizeof(syncChallenge))) drawSync();
-    // Pairing has an absolute two-minute limit; terminal/choice screens auto-lock.
     if ((syncPhase == SYNC_CHOOSE || syncPhase == SYNC_FINISHED || syncPhase == SYNC_FAILED) &&
         millis() - lastAction >= autoLockMs) { lockDevice(); return; }
   }
 
   if (state == ST_WEB && webShownLanguage != activeLanguage) drawWebScreen();
 
-  // WiFi ligado sem uso (tela e navegador): desliga o AP e bloqueia
   if (state == ST_WEB && millis() - max(lastAction, webLastRequest) > WEB_IDLE_MS) {
     stopWeb();
     lockDevice();
@@ -1296,13 +1261,11 @@ void loop() {
     return;
   }
 
-  // Atualiza o indicador de conexao do teclado USB
   if (state == ST_MENU && kbdConnected() != kbdShownConnected) drawKbdStatus();
 
   int tx, ty, gesture;
   bool fading = screenFade.active;
   if (!inputRead(tx, ty, gesture)) return;
-  // Consome toques durante o fade para nao ativar a tela recem-aberta.
   if (fading) return;
   if (state == ST_DETAIL && typingFeedbackVisible) return;
 

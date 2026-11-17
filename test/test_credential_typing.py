@@ -1,4 +1,3 @@
-"""Check production keyboard sequences and detail button bounds on every supported portrait layout."""
 from pathlib import Path
 import shutil
 import subprocess
@@ -6,7 +5,7 @@ import tempfile
 
 root = Path(__file__).resolve().parents[1]
 source = (root / 'src/main.cpp').read_text()
-typing = source[source.index('void typeCredential(int mode) {'):source.index('// Botoes do detalhe:')]
+typing = source[source.index('void typeCredential(int mode) {'):source.index('void detailBtnPos')]
 layout = source[source.index('void detailBtnPos'):source.index('const TextId detLabels')]
 support = r'''
 #include <cassert>
@@ -40,7 +39,6 @@ int main() {
     events.clear();uses=0;connected=false;
     typeCredential(mode);assert(events.empty() && uses==0);
   }
-  // Actual production geometry: controls must fit and not overlap.
   assert(PIN_BOX_Y+PIN_BOX_H<=NP_Y0);
   assert(NP_Y0+NP_ROWS*NP_BH+(NP_ROWS-1)*NP_GAP<=PIN_CANCEL_Y);
   assert(PIN_CANCEL_Y+PIN_CANCEL_H<=SCR_H-2);
