@@ -31,6 +31,7 @@ uint8_t     aesKey[32];
 uint8_t     salt[16];
 unsigned long autoLockMs = AUTOLOCK_MS;
 uint8_t displayBrightness = BRIGHTNESS_DEFAULT;
+bool statusLedEnabled = true;
 bool storageReady = false;
 
 enum CredentialSort : uint8_t { SORT_ALPHA, SORT_RECENT, SORT_USED, SORT_CATEGORY, SORT_COUNT };
@@ -80,6 +81,13 @@ bool setBrightness(uint8_t percent) {
   if (percent == displayBrightness) return true;
   if (prefs.putUChar("brightness", percent) != sizeof(uint8_t)) return false;
   displayBrightness = percent;
+  return true;
+}
+
+bool setStatusLed(bool enabled) {
+  if (enabled == statusLedEnabled) return true;
+  if (prefs.putBool("led", enabled) != sizeof(bool)) return false;
+  statusLedEnabled = enabled;
   return true;
 }
 
@@ -342,6 +350,7 @@ bool storageBegin() {
                         ? brightness : BRIGHTNESS_DEFAULT;
   uint8_t mode = prefs.getUChar("sort", SORT_ALPHA);
   credentialSort = mode < SORT_COUNT ? mode : uint8_t(SORT_ALPHA);
+  statusLedEnabled = prefs.getBool("led", true);
   loadLanguagePreference();
   storageReady = true;
   return true;

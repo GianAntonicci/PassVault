@@ -11,11 +11,20 @@ VaultDisplay tft;
 #include "vault_web.h"
 #include "vault_sync.h"
 #include "screen_fade.h"
+#include "status_led.h"
 
 enum State { ST_PIN_SETUP, ST_PIN_CONFIRM, ST_PIN_ENTRY, ST_MENU, ST_DETAIL, ST_WEB, ST_SEARCH, ST_SETTINGS, ST_THEMES, ST_BRIGHTNESS, ST_SORT,
              ST_PIN_CURRENT, ST_PIN_NEW, ST_PIN_NEW_CONFIRM, ST_LANGUAGES, ST_SYNC };
 State state = ST_PIN_ENTRY;
 ScreenFade screenFade;
+StatusLed statusLed;
+
+StatusLedColor statusLedColor() {
+  if (!statusLedEnabled) return LED_OFF;
+  if (WiFi.getMode() != WIFI_OFF) return LED_WIFI;
+  if (state == ST_PIN_SETUP || state == ST_PIN_CONFIRM || state == ST_PIN_ENTRY) return LED_LOCKED;
+  return LED_UNLOCKED;
+}
 
 void applyBrightness() {
   int duty = (displayBrightness * 255 + 50) / 100;
@@ -738,6 +747,7 @@ void drawSettings() {
 #define BRIGHT_BTN_Y  108
 #define BRIGHT_BTN_W  ((SETTINGS_W - 12) / 2)
 #define BRIGHT_BTN_H  38
+#define BRIGHT_LED_Y  (BRIGHT_BTN_Y + BRIGHT_BTN_H + 32)
 
 void drawBrightness(const char* status = "", bool failed = false) {
   beginScreen();
@@ -755,11 +765,21 @@ void drawBrightness(const char* status = "", bool failed = false) {
   tft.setTextColor(failed ? C_WARN : C_TEXT);
   tft.setTextDatum(TC_DATUM);
   tft.drawString(status, SCR_W / 2, BRIGHT_BTN_Y + BRIGHT_BTN_H + 12, 2);
+#ifdef HAS_STATUS_LED
+  btn(SETTINGS_X, BRIGHT_LED_Y, SETTINGS_W, SETTINGS_H, tr(statusLedEnabled ? TXT_LED_ON : TXT_LED_OFF), C_ACCENT);
+#endif
   btn(SETTINGS_X, SETTINGS_BACK_Y, SETTINGS_W, SETTINGS_H, tr(TXT_BACK), C_BTN);
   focusEnd();
 }
 
 void handleBrightnessTouch(int tx, int ty) {
+#ifdef HAS_STATUS_LED
+  if (inBox(tx, ty, SETTINGS_X, BRIGHT_LED_Y, SETTINGS_W, SETTINGS_H)) {
+    bool saved = setStatusLed(!statusLedEnabled);
+    drawBrightness(tr(saved ? TXT_SAVED : TXT_SAVE_FAILED), !saved);
+    return;
+  }
+#endif
   int next = displayBrightness;
   if (inBox(tx, ty, SETTINGS_X, BRIGHT_BTN_Y, BRIGHT_BTN_W, BRIGHT_BTN_H))
     next = max(BRIGHTNESS_MIN, next - BRIGHTNESS_STEP);
@@ -1194,6 +1214,7 @@ void setup() {
 void loop() {
   DisplayFrame frame;
   if (!storageReady) return;
+  statusLed.show(statusLedColor());
   if (screenFade.tick(millis())) applyBrightness();
   if (state == ST_DETAIL && typingFeedbackVisible &&
       millis() - typingFeedbackShownAt >= TYPING_FEEDBACK_MS) {

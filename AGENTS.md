@@ -58,6 +58,7 @@ PassVault/
 │   ├── jd9853_init.h     # Manufacturer JD9853 register sequence
 │   ├── input.h           # Input abstraction (capacitive touch, buttons)
 │   ├── keyboard.h        # Native USB HID keyboard
+│   ├── status_led.h      # Optional RGB status LED (LED_RGB_PIN)
 │   ├── ui_layout.h       # Shared screen geometry
 │   ├── touch_gesture.h   # Polled touch tap/swipe state machine
 │   ├── vault_core.h      # AES-256-CBC encryption, PBKDF2, NVS storage
@@ -91,6 +92,7 @@ ST_PIN_ENTRY  →  ST_MENU  →  ST_DETAIL
 
 - **input.h** — Unified interface: `inputBegin()`, `inputRead(x, y, gesture)`. Each board implements its own backend (CST816 family, AXS5106L, FT3168, GPIO buttons). Polled touch emits one event on release; the LilyGO AMOLED touch transform follows native portrait coordinates. Supported gestures: tap, swipe up/down, back. Focus system for button-only boards.
 - **keyboard.h** — Unified interface: `kbdBegin()`, `kbdPrint()`, `kbdWrite()`, `kbdConnected()`. Uses native USB HID on all supported ESP32-S3 boards (`KBD_USB_HID` in config.h).
+- **status_led.h** — `StatusLed::show()` drives an optional addressable RGB LED when `LED_RGB_PIN` is defined (no-op otherwise): red = locked, green = unlocked, blue = WiFi active. Toggle stored in NVS (`led`) and shown on the brightness screen.
 - **vault_core.h** — All encryption and persistence. AES key derived via PBKDF2-HMAC-SHA256 (20k iterations) from PIN + salt. Each credential is individually encrypted with a random IV. Storage format: `name|user|pass` → AES-256-CBC → hex string in NVS.
 - **vault_web.h** — WiFi AP with random 10-character password, WebServer with SPA in PROGMEM. REST API: `GET /api/list`, `GET /api/get?id=N`, `POST /api/save`, `POST /api/del?id=N`, `POST /api/export`, `POST /api/import` (encrypted JSON backup protected by a separate backup password). Limit of 1 client, auto-shutdown after 5 min idle.
 

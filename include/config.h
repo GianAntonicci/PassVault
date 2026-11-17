@@ -131,6 +131,10 @@ constexpr size_t AUTOLOCK_OPTION_COUNT = sizeof(AUTOLOCK_OPTIONS_MS) / sizeof(AU
 #define BRIGHTNESS_STEP    10
 #define BRIGHTNESS_DEFAULT 100
 
+#ifndef LED_RGB_LEVEL
+#define LED_RGB_LEVEL     24
+#endif
+
 #define PIN_LEN          6
 #define PIN_LEN_MAX      8
 #define KDF_ITERS        20000

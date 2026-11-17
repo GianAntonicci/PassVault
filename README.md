@@ -12,6 +12,7 @@ It is a PlatformIO project with one firmware and a build environment for each su
 - **Attempt limit:** the wrong-PIN counter is stored in flash, so rebooting does not reset it. After 5 wrong PINs the device locks for 30 s, and the wait doubles with each further error. On the 10th wrong PIN, **the whole vault is erased**.
 - **Auto-lock:** after a configurable inactivity timeout (60 s by default), the device locks and the decrypted credentials are wiped from RAM. Choose 30 s, 60 s, 2 min, 5 min or 10 min in **Config. → Auto-lock**; the choice survives a restart.
 - **Display brightness:** open **Config. → Brilho** and use **−/+** to adjust from 10% to 100% in 10% steps (default: 100%). Changes apply immediately and are saved in NVS, including across restarts. Touch and physical-button navigation are supported.
+- **Status RGB LED (optional):** on a board with an addressable RGB LED (WS2812-style), build with `-DLED_RGB_PIN=<gpio>` to show the vault state: **red** = locked (PIN screens and lockout), **green** = unlocked, **blue** = Wi-Fi active (web management or device sync). Turn it on or off in **Config. → Brilho** (saved in NVS, on by default). None of the currently supported boards has a confirmed onboard RGB LED, so it is disabled in every profile by default; wire an external WS2812 or add the pin to a profile that has one.
 - **Screen transitions:** a non-blocking 180 ms fade eases in each new screen and returns to your selected brightness. Redrawing the same screen does not restart the animation. Auto-lock and Wi-Fi processing remain active; taps during the fade are discarded. Parallel profiles draw directly; SPI and QSPI profiles use a PSRAM framebuffer with Arduino_GFX transport.
 - **Languages:** device and web UI support Portuguese (default), English, Spanish, Mandarin (Simplified Chinese), Italian, Japanese, German and Russian. Change **Config. → Idioma** on the device or **Idioma / Language** at the top of the web UI. The choice is shared, takes effect immediately and survives restarts and PIN changes.
 - **Encrypted storage:** each credential is AES-256-CBC encrypted with a random IV and stored in NVS flash.
@@ -431,6 +432,7 @@ include/
   touch_gesture.h           tap/hold/swipe processing for polled touch
   ui_layout.h               shared drawing and hit-test geometry
   keyboard.h                native USB HID keyboard
+  status_led.h              optional RGB status LED (LED_RGB_PIN)
   vault_core.h              crypto + NVS storage (hardware-independent)
   vault_web.h               Wi-Fi AP + web server + HTML single-page app (hardware-independent)
 src/
@@ -567,6 +569,8 @@ Settings shared by every board:
 | `AP_SSID` / `AP_PASS_LEN` | `PassVault` / 10 | AP name and length of the random password |
 | `WEB_IDLE_MS` | 300000 | Wi-Fi idle time before the AP shuts down and the device locks |
 | `AUTOLOCK_MS` | 60000 | Default inactivity timeout; the device settings override it with a value from `AUTOLOCK_OPTIONS_MS` |
+| `LED_RGB_PIN` | undefined | GPIO of an addressable RGB status LED; undefined or negative disables the feature |
+| `LED_RGB_LEVEL` | 24 | Status LED channel intensity (0–255) |
 | `C_*` | — | UI colours (RGB565) |
 
 Settings for each board (inside the `#if defined(BOARD_xxx)` blocks): `SCR_W`, `SCR_H`, `TFT_ROTATION`, `PIN_POWER_ON`, the touch or button pins, `TOUCH_DEBOUNCE`, `KBD_USB_HID`, and `MENU_SCROLL_BTNS`, which shows ▲/▼ menu buttons on boards without swipe gestures.
