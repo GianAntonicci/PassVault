@@ -1,4 +1,3 @@
-"""Exercise the production CST816 polling gesture state machine on the host."""
 from pathlib import Path
 import shutil
 import subprocess
@@ -22,14 +21,12 @@ int main() {
   assert(!t.sample(true,20,50,x,y,g));
   assert(!t.sample(true,25,110,x,y,g));
   assert(t.sample(false,0,0,x,y,g) && g==1);
-  // Horizontal or diagonal drags do not activate a button.
   assert(!t.sample(true,20,50,x,y,g));
   assert(!t.sample(true,90,60,x,y,g));
   assert(!t.sample(false,0,0,x,y,g));
   assert(!t.sample(true,20,50,x,y,g));
   assert(!t.sample(true,80,110,x,y,g));
   assert(!t.sample(false,0,0,x,y,g));
-  // Small movement remains one tap at the original target.
   assert(!t.sample(true,20,50,x,y,g));
   assert(!t.sample(true,23,54,x,y,g));
   assert(t.sample(false,0,0,x,y,g) && x==20 && y==50 && g==0);

@@ -1,11 +1,9 @@
 #pragma once
 
-// JD9853 register sequence from Waveshare ESP32-S3-Touch-LCD-1.47 Arduino demo:
-// https://files.waveshare.com/wiki/ESP32-S3-Touch-LCD-1.47/ESP32-S3-Touch-LCD-1.47-Demo.zip
 inline void initJD9853(Arduino_DataBus *bus) {
   static const uint8_t init_operations[] = {
     BEGIN_WRITE,
-    WRITE_COMMAND_8, 0x11,  // 2: Out of sleep mode, no args, w/delay
+    WRITE_COMMAND_8, 0x11,
     END_WRITE,
     DELAY, 120,
 
@@ -91,7 +89,7 @@ inline void initJD9853(Arduino_DataBus *bus) {
     DELAY, 10,
 
     BEGIN_WRITE,
-    WRITE_COMMAND_8, 0x29,  // 5: Main screen turn on, no args, w/delay
+    WRITE_COMMAND_8, 0x29,
     END_WRITE
   };
   bus->batchOperation(init_operations, sizeof(init_operations));

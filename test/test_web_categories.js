@@ -1,5 +1,3 @@
-// Exercise the embedded SPA with simulated DOM and API responses.
-// Run: node test/test_web_categories.js
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -116,7 +114,6 @@ const settle = () => new Promise(resolve => setImmediate(resolve));
     const imported = requests.filter(r => r.url === '/api/import').at(-1);
     assert.equal(new URLSearchParams(imported.options.body).get('v'), String(version));
   }
-  // Switch every language without losing in-progress credentials or changing IDs.
   context.openAdd();element('f-name').value = 'Unchanged name';
   element('f-user').value = 'unchanged user';element('f-pass').value = 'secret|&+';
   element('f-category').value = '3';
@@ -127,7 +124,6 @@ const settle = () => new Promise(resolve => setImmediate(resolve));
     assert.equal(element('language').children.length, 8);
     for (const e of marked) {
       if (e.dataset.i18n) {
-        // Favorite is a dynamic action if a detail remains selected.
         if (e === element('d-favorite')) continue;
         assert.equal(e.textContent, catalog.strings[e.dataset.i18n][id]);
       }

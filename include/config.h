@@ -1,17 +1,12 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-// =====================================================================
-//  Configuracao por placa (BOARD_XXX vem do platformio.ini)
-// =====================================================================
-
 #if defined(BOARD_TDISPLAY_S3_TOUCH)
   #define BOARD_NAME      "T-Display S3 Touch"
   #define SCR_W           170
   #define SCR_H           320
   #define TFT_ROTATION    0
   #define PIN_POWER_ON    15
-  // Touch CST816S (I2C)
   #define TOUCH_SDA       18
   #define TOUCH_SCL       17
   #define TOUCH_RST       21
@@ -25,11 +20,10 @@
   #define SCR_H           320
   #define TFT_ROTATION    0
   #define PIN_POWER_ON    15
-  // Botoes fisicos (ativos em LOW)
-  #define BTN_DOWN        0    // baixo / confirma (segurar)
-  #define BTN_UP          14   // cima / volta (segurar)
+  #define BTN_DOWN        0
+  #define BTN_UP          14
   #define BTN_LONG_MS     600
-  #define TOUCH_DEBOUNCE  0    // botoes ja tem debounce proprio em input.h
+  #define TOUCH_DEBOUNCE  0
   #define KBD_USB_HID
 
 #elif defined(BOARD_WAVESHARE_S3_TOUCH_169)
@@ -37,7 +31,7 @@
   #define SCR_W           240
   #define SCR_H           280
   #define TFT_ROTATION    0
-  #define PIN_POWER_ON    41  // SYS_EN: hold battery power on
+  #define PIN_POWER_ON    41
   #define TOUCH_SDA       11
   #define TOUCH_SCL       10
   #define TOUCH_RST       13
@@ -128,42 +122,28 @@
   #error "Select a supported BOARD_* profile in platformio.ini."
 #endif
 
-// =====================================================================
-//  Constantes compartilhadas
-// =====================================================================
-
-// Settings
 #define MAX_CREDS      30
-#define AUTOLOCK_MS     60000UL  // padrao quando nao ha preferencia salva
+#define AUTOLOCK_MS     60000UL
 constexpr unsigned long AUTOLOCK_OPTIONS_MS[] = {30000UL, 60000UL, 120000UL, 300000UL, 600000UL};
 constexpr size_t AUTOLOCK_OPTION_COUNT = sizeof(AUTOLOCK_OPTIONS_MS) / sizeof(AUTOLOCK_OPTIONS_MS[0]);
-#define BRIGHTNESS_MIN     10  // nunca apaga a tela durante o ajuste
+#define BRIGHTNESS_MIN     10
 #define BRIGHTNESS_MAX    100
 #define BRIGHTNESS_STEP    10
 #define BRIGHTNESS_DEFAULT 100
 
-// ---- Seguranca ----
-// Tamanho do PIN de vaults NOVOS (vaults antigos continuam com 4)
 #define PIN_LEN          6
 #define PIN_LEN_MAX      8
-// Iteracoes do PBKDF2-HMAC-SHA256 (mais = mais lento p/ brute force e p/ desbloquear)
 #define KDF_ITERS        20000
 
-// Tentativas erradas de PIN (contador persistente, sobrevive a reboot):
-//   a partir de LOCKOUT_AFTER erros, espera LOCKOUT_MS, dobrando a cada erro
-//   ao chegar em WIPE_AFTER erros, o vault inteiro e APAGADO (0 = nunca apagar)
 #define LOCKOUT_AFTER    5
 #define LOCKOUT_MS       30000
 #define LOCKOUT_MAX_MS   600000
 #define WIPE_AFTER       10
 
-// WiFi AP: senha aleatoria nova a cada ativacao, 1 cliente por vez,
-// desliga e bloqueia apos WEB_IDLE_MS sem uso
 #define AP_SSID          "PassVault"
 #define AP_PASS_LEN      10
 #define WEB_IDLE_MS      300000
 
-// Paletas RGB565. A ordem tambem identifica o tema salvo na NVS.
 struct ColorTheme {
   const char* name;
   uint16_t text, accent, button, dim, card;
@@ -177,7 +157,6 @@ const ColorTheme COLOR_THEMES[] = {
 constexpr size_t THEME_COUNT = sizeof(COLOR_THEMES) / sizeof(COLOR_THEMES[0]);
 uint8_t activeTheme = 0;
 
-// Cores semanticas: avisos e confirmacoes mantem vermelho/verde.
 #define C_BG      0x0000
 #define C_TEXT    (COLOR_THEMES[activeTheme].text)
 #define C_ACCENT  (COLOR_THEMES[activeTheme].accent)
@@ -187,7 +166,6 @@ uint8_t activeTheme = 0;
 #define C_DIM     (COLOR_THEMES[activeTheme].dim)
 #define C_CARD    (COLOR_THEMES[activeTheme].card)
 
-// Tipos: Sem tipo (cinza), Redes Sociais (lilas), Email (ciano), Banco (verde), Trabalho (amarelo).
 const uint16_t C_CATEGORY[] = { 0xBDF7, 0xC3FF, 0x07FF, 0x07E0, 0xFFE0 };
 
 #endif

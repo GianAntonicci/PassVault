@@ -123,6 +123,7 @@ Layout is selected at compile time:
 
 ## Code conventions
 
+- Never add comments in code; write self-explanatory code without inline, block, or header comments
 - `.h` headers in `include/` contain implementation (not just declarations)
 - `vault_core.h` and `vault_web.h` use global variables with `extern` across modules
 - All UI uses the TFT_eSPI drawing API through `VaultDisplay` (no UI framework); `display.h` selects direct rendering or a PSRAM sprite with Arduino_GFX transport

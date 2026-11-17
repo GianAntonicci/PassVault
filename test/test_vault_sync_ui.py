@@ -1,11 +1,10 @@
-"""Compile production sync UI for all panel sizes; check focus targets and input."""
 from pathlib import Path
 import subprocess
 import tempfile
 
 root = Path(__file__).resolve().parents[1]
 main = (root / 'src/main.cpp').read_text()
-ui = main[main.index('// ---- Device-to-device sync'):main.index('// ---- Web Screen ----')]
+ui = main[main.index('#define SYNC_ACTION_Y'):main.index('#define WEB_BTN_W')]
 settings = main[main.index('void drawSettings() {'):main.index('#define BRIGHT_BTN_Y')]
 protocol = (root / 'include/vault_sync.h').read_text()
 enums = protocol[protocol.index('enum SyncPhase'):protocol.index('SyncPhase syncPhase')]
@@ -87,7 +86,6 @@ int main() {
   assert(syncPhase==SYNC_SCANNING);
   syncPhase=SYNC_SELECT;drawSync();handleSyncTouch(11,SYNC_ACTION_Y+1);
   assert(syncPhase==SYNC_CODE && targets.size()==14);
-  // Twelve digits alone do not start receiving. Explicit confirmation is required.
   for(int i=0;i<12;i++)handleSyncTouch(11,SYNC_KEY_Y+1);
   assert(strlen(syncCode)==12 && connectCalls==0);
   handleSyncTouch(11,SYNC_KEY_Y+1);assert(strlen(syncCode)==12);

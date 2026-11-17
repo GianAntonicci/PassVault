@@ -2,7 +2,6 @@
 
 #include "unicode_font.h"
 
-// Bounded UTF-8 decoding. Invalid input consumes at least one byte and uses '?'.
 inline uint32_t nextUiCodepoint(const char*& text) {
   uint8_t first = static_cast<uint8_t>(*text++);
   if (first < 0x80) return first;
@@ -47,8 +46,6 @@ inline int uiTextWidth(const char* text, uint8_t font) {
   return width;
 }
 
-// Both the direct TFT and the PSRAM sprite expose the same pixel API and datum.
-// Only translated Unicode/overlong text uses this renderer; native ASCII fonts remain.
 template <typename Surface>
 int drawUiBitmap(Surface& surface, const char* text, int x, int y, uint8_t font, int maxWidth) {
   int natural = uiTextWidth(text, font), height = uiFontHeight(font);

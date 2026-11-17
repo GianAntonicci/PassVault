@@ -3,7 +3,6 @@
 
 #include <stdint.h>
 
-// Apenas o nivel de luz: nao guarda pixels nem dados das credenciais.
 class ScreenFade {
 public:
   static constexpr uint32_t DURATION_MS = 180;
@@ -22,7 +21,7 @@ public:
 
   bool tick(uint32_t now) {
     if (!active) return false;
-    uint32_t elapsed = now - startedAt;  // seguro no rollover de millis()
+    uint32_t elapsed = now - startedAt;
     if (elapsed >= DURATION_MS) {
       active = false;
       level = 255;
@@ -31,7 +30,6 @@ public:
     if (now - lastFrame < FRAME_MS) return false;
     lastFrame = now;
     uint32_t t = elapsed * 255 / DURATION_MS;
-    // Smoothstep: acelera e desacelera sem degraus nas extremidades.
     level = (t * t * (765 - 2 * t) + 32512) / 65025;
     return true;
   }

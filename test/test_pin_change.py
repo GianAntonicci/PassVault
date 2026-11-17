@@ -1,8 +1,3 @@
-"""Host fault-injection tests for the production PIN transaction (crypto mocked).
-
-Run: python3 test/test_pin_change.py
-Requires a C++17 compiler. No device, packages or real credentials are used.
-"""
 from pathlib import Path
 import shutil
 import subprocess
@@ -11,9 +6,8 @@ import tempfile
 
 root = Path(__file__).resolve().parents[1]
 source = (root / "include/vault_core.h").read_text()
-# Compile the actual transaction code, with deterministic crypto and an NVS fake.
 transaction = source[source.index("bool finishPinChange() {"):source.index("void loadLanguagePreference() {")]
-wipe = source[source.index("void storageWipe() {"):source.index("// Novo salt + chave v2")]
+wipe = source[source.index("void storageWipe() {"):source.index("void setupPin(")]
 support = r'''
 #include <cassert>
 #include <cstdint>
@@ -79,7 +73,6 @@ bool derivePinKey(const char* pin, const uint8_t* s, uint8_t* key, uint8_t* ver)
   for (int i = 0; i < 32; ++i) { key[i] = pin[i % strlen(pin)] ^ s[i % 16]; ver[i] = key[i] ^ 123; }
   return true;
 }
-// Deterministic reversible stand-in: same block/hex sizing as encryptData.
 String encryptData(const char* plain, const uint8_t* key = aesKey) {
   std::string data(plain), enc(32, '0');
   int pad = 16 - data.size() % 16; data.append(pad, char(pad));
@@ -140,15 +133,13 @@ int main() {
     for (int at = 0; at <= total; ++at) {
       seed(n, oldLength); cut = at;
       try { changePin("654321"); } catch (const PowerCut&) {}
-      // Reboot with all NVS writes succeeding, using only persistent state.
       cut = -1; memset(aesKey, 0, 32); memset(salt, 0, 16);
       assert(finishPinChange()); assertVault(n, oldLength); ++scenarios;
 
       seed(n, oldLength); fail = at;
       auto result = changePin("654321");
       if (result == PIN_CHANGE_PENDING) {
-        assert(!finishPinChange()); // Persistent write failures must fail closed.
-        // Also cut power at each write of recovery, then recover again.
+        assert(!finishPinChange());
         Store pending = disk; fail = -1; writes = 0;
         assert(finishPinChange()); int recoveryWrites = writes;
         for (int retry = 0; retry <= recoveryWrites; ++retry) {
@@ -163,12 +154,10 @@ int main() {
   seed(2, 6); Store original = disk;
   assert(changePin("12345") == PIN_CHANGE_FAILED && disk == original);
   assert(changePin("abc123") == PIN_CHANGE_FAILED && disk == original);
-  // Incomplete staging must never replace the active vault.
   prefs.putBool("pinchange", true); Store beforeRecovery = disk;
   assert(!finishPinChange() && disk["pv"] == beforeRecovery["pv"]);
   seed(2, 6); prefs.putString("c1", "invalid"); original = disk;
   assert(changePin("654321") == PIN_CHANGE_FAILED && disk["pv"] == original["pv"]);
-  // Full vault wipe must also erase any interrupted staging copy.
   seed(2, 6); fail = 8;
   changePin("654321"); fail = -1;
   assert(!disk["pvnext"].empty());

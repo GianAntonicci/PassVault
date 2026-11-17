@@ -1,13 +1,9 @@
-"""Host regression tests for production sync wire validation and NVS merge.
-Run: python3 test/test_vault_sync.py. Crypto is mocked here; firmware uses mbedTLS.
-"""
 from pathlib import Path
 import subprocess
 import tempfile
+import ast
 
 root = Path(__file__).resolve().parents[1]
-# Reuse the existing Arduino/NVS host doubles without executing the test module.
-import ast
 module = ast.parse((root / 'test/test_credential_sort.py').read_text())
 support = next(ast.literal_eval(n.value) for n in module.body
                if isinstance(n, ast.Assign) and any(isinstance(t, ast.Name) and t.id == 'support' for t in n.targets))
@@ -15,7 +11,7 @@ support = support.replace('bool fail = false;', 'bool fail = false; int failAt =
 support = support.replace('if(fail)return 0;', 'if(fail || writes++ == failAt)return 0;')
 support = support.replace('text[k]=s;return s.size();', 'if(fail || writes++ == failAt)return 0;text[k]=s;return s.size();')
 core = (root / 'include/vault_core.h').read_text()
-struct = core[core.index('enum CredentialCategory'):core.index('// ---- Globals ----')]
+struct = core[core.index('enum CredentialCategory'):core.index('Preferences prefs;')]
 production = (root / 'include/vault_sync_data.h').read_text().replace('#include "vault_core.h"', '')
 checks = r'''
 uint8_t data[SYNC_DATA_SIZE];
@@ -54,7 +50,6 @@ int main() {
   reset();data[0]=2;record(0,"new");record(1,"new2");credCount=MAX_CREDS-1;
   for(int i=0;i<credCount;i++)strcpy(creds[i].name,"existing");
   assert(syncMerge(data,sizeof(data),added,skipped)==-2 && prefs.writes==0);
-  // Every write failure leaves count/RAM unchanged for the incomplete record.
   for(int step=0;step<5;step++) {
     reset();data[0]=1;record(0,"mail");prefs.failAt=step;
     assert(syncMerge(data,sizeof(data),added,skipped)==-3 && credCount==0 && added==0);
@@ -66,7 +61,6 @@ int main() {
   assert(syncMerge(data,sizeof(data),added,skipped)==-3 && added==1 && credCount==1);
   prefs.failAt=-1;
   assert(syncMerge(data,sizeof(data),added,skipped)==0 && added==1 && skipped==1);
-  // Full vault and maximum-length fields, including a pipe in the password.
   reset();memset(data,0,sizeof(data));data[0]=MAX_CREDS;
   for(int i=0;i<MAX_CREDS;i++) {
     uint8_t* p=data+1+i*SYNC_ENTRY_SIZE;

@@ -1,4 +1,3 @@
-"""Host tests for screen transitions. Run: python3 test/test_screen_fade.py."""
 from pathlib import Path
 import shutil
 import subprocess
@@ -33,29 +32,28 @@ int main() {
     previous = screenFade.level;
   }
   assert(!screenFade.active && screenFade.level == 255);
-  assert(!screenFade.begin(1, 300));  // redesenho nao pisca
+  assert(!screenFade.begin(1, 300));
   assert(!screenFade.tick(300));
 
   assert(screenFade.begin(2, 400));
   assert(screenFade.tick(490));
   assert(screenFade.level >= 125 && screenFade.level <= 129);
-  assert(!screenFade.begin(2, 491));  // nao reinicia no meio do fade
-  assert(screenFade.begin(3, 492));   // troca de tela interrompe o fade
+  assert(!screenFade.begin(2, 491));
+  assert(screenFade.begin(3, 492));
   assert(screenFade.level == 0);
-  screenFade.cancel();               // avisos de seguranca ficam visiveis
+  screenFade.cancel();
   assert(!screenFade.active && screenFade.level == 255);
   assert(!screenFade.tick(600));
   assert(screenFade.begin(3, 600));
-  assert(screenFade.tick(1600));      // loop atrasado termina a animacao
+  assert(screenFade.tick(1600));
   assert(screenFade.level == 255 && !screenFade.active);
 
   screenFade.begin(4, UINT32_MAX - 50);
-  screenFade.tick(39);               // 90 ms depois, atraves do rollover
+  screenFade.tick(39);
   assert(screenFade.active && screenFade.level >= 125 && screenFade.level <= 129);
   screenFade.tick(129);
   assert(!screenFade.active && screenFade.level == 255);
 
-  // O brilho final e preservado, inclusive com backlight ativo em LOW.
   for (int brightness = 10; brightness <= 100; brightness += 10) {
     displayBrightness = brightness;
     screenFade.level = 255;

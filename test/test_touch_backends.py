@@ -1,4 +1,3 @@
-"""Exercise production I2C touch decoding and gesture generation with recorded-format packets."""
 from pathlib import Path
 import shutil
 import subprocess
@@ -7,7 +6,7 @@ import tempfile
 root = Path(__file__).resolve().parents[1]
 source = (root / 'include/input.h').read_text()
 backend = source[source.index('#include <Wire.h>'):source.index('#elif defined(BOARD_TDISPLAY_S3)')]
-backend = backend.replace('#include <Wire.h>', '').rsplit('// ---------------------------------------------------------------------', 1)[0]
+backend = backend.replace('#include <Wire.h>', '')
 support = r'''
 #include <cassert>
 #include <cstdint>
@@ -64,7 +63,6 @@ bool sample(bool down, int sx, int sy, int &x, int &y, int &gesture) {
 int main() {
   inputBegin();
   int x=-1,y=-1,g=-1;
-  // Corners and middle map into the same portrait coordinate system as drawing.
   for (auto p : std::vector<std::pair<int,int>>{{0,0},{SCR_W-1,SCR_H-1},{70,110}}) {
     assert(!sample(true,p.first,p.second,x,y,g));
     for(int i=0;i<10;i++) assert(!sample(true,p.first,p.second,x,y,g));
@@ -74,8 +72,7 @@ int main() {
   }
   assert(!sample(true,60,150,x,y,g));
   assert(!sample(true,60,70,x,y,g));
-  assert(sample(false,60,70,x,y,g) && g==2); // Swipe, no tap.
-  // Failed and truncated reads must not manufacture a release/tap.
+  assert(sample(false,60,70,x,y,g) && g==2);
   assert(!sample(true,60,100,x,y,g));
   Wire.error=1;
   assert(!sample(false,60,100,x,y,g));

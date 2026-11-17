@@ -5,11 +5,10 @@
 #include <mbedtls/gcm.h>
 #include "vault_sync_data.h"
 
-// Independent TCP service: web management is never available during pairing.
 constexpr uint16_t SYNC_PORT = 43821;
 constexpr unsigned long SYNC_SESSION_MS = 120000;
 constexpr unsigned long SYNC_IO_MS = 15000;
-constexpr size_t SYNC_HEADER_SIZE = 52; // magic/version 8, salt 16, IV 12, GCM tag 16
+constexpr size_t SYNC_HEADER_SIZE = 52;
 constexpr size_t SYNC_PACKET_SIZE = SYNC_HEADER_SIZE + SYNC_DATA_SIZE;
 const uint8_t SYNC_MAGIC[8] = {'P','V','S','Y','N','C',0,1};
 
@@ -26,7 +25,7 @@ uint8_t syncNetworkCount = 0;
 uint8_t syncNetworkIndex = 0;
 uint8_t syncChallenge[16] = {};
 uint8_t* syncPacket = nullptr;
-uint8_t syncAck[35] = {}; // status, added, skipped, HMAC-SHA256
+uint8_t syncAck[35] = {};
 size_t syncOffset = 0;
 unsigned long syncStarted = 0, syncProgress = 0;
 int syncAdded = 0, syncSkipped = 0;
@@ -76,8 +75,6 @@ bool syncAllocate() {
   return true;
 }
 
-// A fresh receiver challenge is authenticated as AAD, preventing old packet replay.
-// Both AP authentication and the independent payload key use the temporary code.
 bool syncCrypt(bool encrypt) {
   uint8_t key[32];
   int r = mbedtls_pkcs5_pbkdf2_hmac_ext(MBEDTLS_MD_SHA256,
@@ -89,7 +86,6 @@ bool syncCrypt(bool encrypt) {
   mbedtls_gcm_init(&ctx);
   if (!r) r = mbedtls_gcm_setkey(&ctx, MBEDTLS_CIPHER_ID_AES, key, 256);
   uint8_t* body = syncPacket + SYNC_HEADER_SIZE;
-  // mbedTLS GCM decryption does not support identical input/output buffers.
   uint8_t* output = (uint8_t*)malloc(SYNC_DATA_SIZE);
   if (!output) r = -1;
   if (!r && encrypt)
@@ -105,8 +101,6 @@ bool syncCrypt(bool encrypt) {
   return r == 0;
 }
 
-// Bind the delivery receipt to this challenge and encrypted packet.
-// A TCP write alone never means credentials were saved.
 bool syncReceipt(bool verify) {
   uint8_t key[32], mac[32], message[35];
   memcpy(message, syncChallenge, 16);
@@ -130,7 +124,6 @@ bool syncReceipt(bool verify) {
 void syncStartSender() {
   syncStop();
   syncStarted = syncProgress = millis();
-  // Rejection sampling avoids modulo bias in the 12-digit (about 40-bit) code.
   for (int i = 0; i < 12; ) {
     uint8_t n = (uint8_t)esp_random();
     if (n < 250) syncCode[i++] = '0' + n % 10;
@@ -170,7 +163,7 @@ void syncConfirmSend() {
   if (!syncClient.connected()) { syncFinish(false, tr(TXT_SYNC_DESTINATION_LOST)); return; }
   if (!syncAllocate()) return;
   memcpy(syncPacket, SYNC_MAGIC, 8);
-  esp_fill_random(syncPacket + 8, 28); // salt and IV
+  esp_fill_random(syncPacket + 8, 28);
   if (!syncEncode(syncPacket + SYNC_HEADER_SIZE) || !syncValidData(syncPacket + SYNC_HEADER_SIZE, SYNC_DATA_SIZE) || !syncCrypt(true)) {
     syncFinish(false, tr(TXT_SYNC_ENCRYPT_FAILED)); return;
   }
@@ -180,7 +173,7 @@ void syncConfirmSend() {
 
 void syncTick() {
   if (syncPhase == SYNC_OFF || syncPhase == SYNC_CHOOSE ||
-      syncPhase == SYNC_FINISHED || syncPhase == SYNC_FAILED) return;
+       syncPhase == SYNC_FINISHED || syncPhase == SYNC_FAILED) return;
   if (millis() - syncStarted >= SYNC_SESSION_MS) {
     syncFinish(false, tr(TXT_SYNC_TIMEOUT)); return;
   }
@@ -208,7 +201,6 @@ void syncTick() {
     syncProgress = millis();
     syncPhase = SYNC_WAIT_CONFIRM;
   } else if (syncPhase == SYNC_WAIT_CONFIRM) {
-    // Exactly one connection per session; a failed attempt requires a fresh code.
     if (syncOffset < sizeof(syncChallenge) && syncClient.available()) {
       int n = syncClient.read(syncChallenge + syncOffset, sizeof(syncChallenge) - syncOffset);
       if (n > 0) { syncOffset += n; syncProgress = millis(); }
@@ -240,7 +232,6 @@ void syncTick() {
       if (!syncReceipt(false) || syncClient.write(syncAck, sizeof(syncAck)) != sizeof(syncAck)) {
         syncFinish(false, r == 0 ? tr(TXT_SYNC_SAVED_REPLY_FAILED) : tr(TXT_SYNC_FAILED_REPLY_LOST)); return;
       }
-      // Leave the radio alive so the receipt can reach the source before shutdown.
       syncMessage = r == 0 ? tr(TXT_SYNC_RECEIVED) : r == -2 ? tr(TXT_SYNC_NO_SPACE) :
           r == -3 ? tr(TXT_SAVE_FAILED) : tr(TXT_SYNC_INVALID_DATA);
       syncWipePacket();
