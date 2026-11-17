@@ -27,7 +27,7 @@ PassVault is a hardware password manager running on ESP32-S3 boards with native 
 - **Framework:** Arduino (via PlatformIO)
 - **Platform:** espressif32
 - **Language:** C++ (Arduino-style)
-- **Display:** TFT_eSPI (Bodmer); Arduino_GFX SPI/QSPI transport for JD9853 and AMOLED
+- **Display:** TFT_eSPI (Bodmer); Arduino_GFX SPI/QSPI transport for ST7789 SPI, JD9853 and AMOLED
 - **Encryption:** mbedTLS (AES-256-CBC, PBKDF2-HMAC-SHA256)
 - **Storage:** NVS (Preferences.h)
 - **USB HID:** TinyUSB (native on ESP32-S3)
@@ -167,7 +167,7 @@ pio device monitor -b 115200
 ## Dependencies (lib_deps)
 
 - `bodmer/TFT_eSPI` — Display/fonts (all boards)
-- `moononournation/GFX Library for Arduino@1.6.9` — JD9853 SPI and CO5300/RM67162 QSPI transport
+- `moononournation/GFX Library for Arduino@1.6.9` — ST7789/JD9853 SPI and CO5300/RM67162 QSPI transport
 - `fbiego/CST816S` — Capacitive touch (T-Display S3 Touch only)
 
 ## Links

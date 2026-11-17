@@ -15,7 +15,16 @@
 class VaultDisplay {
   TFT_eSPI fontHost;
   TFT_eSprite canvas{&fontHost};
-#if defined(BOARD_WAVESHARE_S3_TOUCH_147)
+#if defined(BOARD_WAVESHARE_S3_TOUCH_169)
+  Arduino_ESP32SPI bus{4, 5, 6, 7, -1};
+  Arduino_ST7789 panel{&bus, 8, 0, true, 240, 280, 0, 20, 0, 20};
+#elif defined(BOARD_WAVESHARE_S3_TOUCH_183)
+  Arduino_ESP32SPI bus{4, 5, 6, 7, -1};
+  Arduino_ST7789 panel{&bus, 38, 0, true, 240, 284, 0, 0, 0, 0};
+#elif defined(BOARD_WAVESHARE_S3_TOUCH_154)
+  Arduino_ESP32SPI bus{45, 21, 38, 39, -1};
+  Arduino_ST7789 panel{&bus, 40, 0, true, 240, 240, 0, 0, 0, 0};
+#elif defined(BOARD_WAVESHARE_S3_TOUCH_147)
   Arduino_ESP32SPI bus{45, 21, 38, 39, -1};
   Arduino_ST7789 panel{&bus, 40, 0, false, 172, 320, 34, 0, 34, 0};
 #elif defined(BOARD_WAVESHARE_S3_AMOLED_164)

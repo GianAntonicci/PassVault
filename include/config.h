@@ -45,6 +45,7 @@
   #define TOUCH_DEBOUNCE  100
   #define INPUT_CST816_POLL
   #define KBD_USB_HID
+  #define DISPLAY_GFX
 
 #elif defined(BOARD_WAVESHARE_S3_TOUCH_183)
   #define BOARD_NAME      "Waveshare S3 Touch 1.83"
@@ -59,6 +60,7 @@
   #define TOUCH_DEBOUNCE  100
   #define INPUT_CST816_POLL
   #define KBD_USB_HID
+  #define DISPLAY_GFX
 
 #elif defined(BOARD_WAVESHARE_S3_TOUCH_154)
   #define BOARD_NAME         "Waveshare S3 Touch 1.54"
@@ -73,6 +75,7 @@
   #define TOUCH_DEBOUNCE     100
   #define INPUT_CST816_POLL
   #define KBD_USB_HID
+  #define DISPLAY_GFX
 
 #elif defined(BOARD_WAVESHARE_S3_TOUCH_147)
   #define BOARD_NAME         "Waveshare S3 Touch 1.47"
